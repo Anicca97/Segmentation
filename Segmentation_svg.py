@@ -20,7 +20,7 @@ SVGAttribute = ['about', 'baseProfile', 'class', 'content', 'contentScriptType',
 
 
 
-def saveImage(filenum, dstdir, flags, contours, broken, img, hier, dirname, svg, t):
+def saveImage(filenum, dstdir, flags, contours, img, dirname, svg, t):
     # Creat a directory for the segmentations of the image
     if filenum == 1:
         if os.path.exists(dstdir):
