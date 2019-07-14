@@ -20,7 +20,7 @@ SVGAttribute = ['about', 'baseProfile', 'class', 'content', 'contentScriptType',
 
 
 
-def saveImage(filenum, dstdir, flags, contours, img, dirname, svg, t):
+def saveImage(filenum, dstdir, dirname, xratio, yratio, resized, img, svg, t, contours, flags):
     # Creat a directory for the segmentations of the image
     if filenum == 1:
         if os.path.exists(dstdir):
@@ -34,8 +34,6 @@ def saveImage(filenum, dstdir, flags, contours, img, dirname, svg, t):
                 rmtree(temp_path)
         os.mkdir(dstdir)
 
-    allmask = np.zeros((img.shape[0], img.shape[1], 1), np.uint8)
-
     for cidx, cnt in enumerate(contours):
         # If the flag for the contour is False, skip it
         if flags[cidx] == False:
@@ -43,6 +41,11 @@ def saveImage(filenum, dstdir, flags, contours, img, dirname, svg, t):
 
         # Get the position of each contour
         (x, y, w, h) = cv2.boundingRect(cnt)
+        if resized == True:
+            x = int(x * xratio)
+            w = int(w * xratio)
+            y = int(y * yratio)
+            h = int(h * yratio)
         if w <= 10 or h <= 10:
             continue
         namenow = dirname + '_' + str(filenum) + '.png'
@@ -54,81 +57,16 @@ def saveImage(filenum, dstdir, flags, contours, img, dirname, svg, t):
         cv2.drawContours(segmask, [cnt], 0, (255), -1)
 
         seg = cv2.bitwise_and(img, img, mask=segmask)
-        allmask = cv2.bitwise_or(allmask, segmask)
-
-        # Write the element into file system
-        cv2.imwrite(os.path.join(dstdir, namenow), seg[y:y+h, x:x+w])
-
-        if svg is not None:
-            segpath = list()
-            attributes = list()
-            for i, path in enumerate(svg[0]):
-                p1x = path.point(0).real * t
-                p1y = path.point(0).imag * t
-                p2x = path.point(1).real * t
-                p2y = path.point(1).imag * t
-                incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
-                incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
-                if incnt1 >= 0 or incnt2 >= 0:
-                    segpath.append(path)
-                    attributes.append(svg[1][i])
-            svg_attributes = svg[2]
-            svg_attributes['viewBox'] = '{} {} {} {}'.format(x/t, y/t, w/t, h/t)
-            wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
-
-    # Delete the element in the original image
-    allmask = cv2.dilate(allmask, np.ones((10,10), np.uint8))
-    allmask = cv2.bitwise_not(allmask)
-    self.img = cv2.bitwise_and(self.img, self.img, mask=allmask)
-
-    # Get the RGBA image from the BGRA image
-    self.img_cvt = np.copy(self.img)
-    tmp = np.copy(self.img[:,:,0])
-    self.img_cvt[:,:,0] = self.img[:,:,2]
-    self.img_cvt[:,:,2] = tmp
-
-    # Get the binary image
-    self.achannel = self.img[:,:,-1]
-    self.mask = cv2.inRange(self.achannel, 1, 255)
-
-
-
-def saveResizedImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, flags):
-    # Creat a directory for the segmentations of the image
-    if filenum == 1:
-        if os.path.exists(dstdir):
-            temp_path = dstdir+'_tmp'
-            try:
-                os.renames(dstdir, temp_path)
-            except OSError as e:
-                if e.errno != errno.ENOENT:
-                    raise
-            else:
-                rmtree(temp_path)
-        os.mkdir(dstdir)
-
-    for cidx, cnt in enumerate(contours):
-        # If the flag for the contour is False, skip it
-        if flags[cidx] == False:
-            continue
-
-        # Get the position of each contour
-        (x, y, w, h) = cv2.boundingRect(cnt)
-        x = int(x * xratio)
-        w = int(w * xratio)
-        y = int(y * yratio)
-        h = int(h * yratio)
-        if w <= 10 or h <= 10:
-            continue
-        namenow = dirname + '_' + str(filenum) + '.png'
-        svgnow = dirname + '_' + str(filenum) + '.svg'
-        filenum += 1
 
         # Delete the parts of other segmentations using mask
-        segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-        cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
-        segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
-        segmask = cv2.inRange(segmask, 1, 255)
+        if resized == True:
+            segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
+            cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+            segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
+            segmask = cv2.inRange(segmask, 1, 255)
+        else:
+            segmask = np.zeros((img.shape[0], img.shape[1], 1), np.uint8)
+            cv2.drawContours(segmask, [cnt], 0, (255), -1)
 
         seg = cv2.bitwise_and(img, img, mask=segmask)
 
@@ -574,8 +512,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
 
-    def changeResizedImage(self):
-        allmask = np.zeros((2000, 2000, 1), np.uint8)
+    def changeImage(self):
+        if self.resized == True:
+            allmask = np.zeros((2000, 2000, 1), np.uint8)
+        else:
+            allmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
 
         for cidx, cnt in enumerate(self.contours):
             # If the flag for the contour is False, skip it
@@ -588,26 +529,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # Get the position of each contour
             (x, y, w, h) = cv2.boundingRect(cnt)
-            x = int(x * self.xratio)
-            w = int(w * self.xratio)
-            y = int(y * self.yratio)
-            h = int(h * self.yratio)
+            if self.resized == True:
+                x = int(x * self.xratio)
+                w = int(w * self.xratio)
+                y = int(y * self.yratio)
+                h = int(h * self.yratio)
             if w <= 10 or h <= 10:
                 continue
 
             # Delete the parts of other segmentations using mask
-            segmask = np.zeros((2000, 2000, 1), np.uint8)
-            cv2.drawContours(segmask, [cnt], 0, (255), -1)
-
-            if self.broken == True:
-                now = self.hier[0][cidx][2]
-                while(now != -1):
-                    if self.hier[0][now][2] != -1:
-                        segmask_tmp = np.zeros((2000, 2000, 1), np.uint8)
-                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, (255), -1)
-                        segmask = cv2.bitwise_xor(segmask, segmask_tmp)
-                        allmask = cv2.bitwise_or(allmask, segmask)
-                    now = self.hier[0][now][0]
+            if self.resized == True:
+                segmask = np.zeros((2000, 2000, 1), np.uint8)
+                cv2.drawContours(segmask, [cnt], 0, (255), -1)
+            else:
+                segmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
+                cv2.drawContours(segmask, [cnt], 0, (255), -1)
 
             allmask = cv2.bitwise_or(allmask, segmask)
 
@@ -851,10 +787,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             haveDone = self.flags[cidx] and haveDone
 
         if haveDone == False or self.broken == True:
-            if self.resized == True and self.broken == False:
-                self.changeResizedImage()
+            if self.broken == False:
+                self.changeImage()
                 filenum = self.filenum
-                p = multiprocessing.Process(target=saveResizedImage, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
+                p = multiprocessing.Process(target=saveImage, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.resized, self.img, self.svg, self.t, self.contours, self.flags))
                 p.start()
 
                 for cidx, cnt in enumerate(self.contours):
@@ -873,10 +809,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.filenum += 1
 
             else:
-                if self.broken == False:
-                    self.saveImage()
-                else:
-                    self.saveBrokenImage()
+                self.saveBrokenImage()
 
             self.group = False
             self.broken = False
