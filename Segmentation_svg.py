@@ -438,6 +438,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             h = int(h * self.yratio)
             if w <= 10 or h <= 10:
                 continue
+            self.filenum += 1
 
             # Delete the parts of other segmentations using mask
             segmask = np.zeros((2000, 2000, 1), np.uint8)
@@ -631,25 +632,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if haveDone == False or self.broken == True:
             if self.broken == False:
-                self.changeImage()
                 filenum = self.filenum
                 p = multiprocessing.Process(target=saveImage, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
                 p.start()
-
-                for cidx, cnt in enumerate(self.contours):
-                    # If the flag for the contour is False, skip it
-                    if self.flags[cidx] == False:
-                        continue
-
-                    # Get the position of each contour
-                    (x, y, w, h) = cv2.boundingRect(cnt)
-                    x = int(x * self.xratio)
-                    w = int(w * self.xratio)
-                    y = int(y * self.yratio)
-                    h = int(h * self.yratio)
-                    if w <= 10 or h <= 10:
-                        continue
-                    self.filenum += 1
+                self.changeImage()
 
             else:
                 self.saveBrokenImage()
@@ -669,6 +655,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
     def saveBrokenImage(self):
+        if self.img is None or self.svg is None:
+            return
+
         # Creat a directory for the segmentations of the image
         if self.filenum == 1:
             if os.path.exists(self.dstdir):
@@ -705,12 +694,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             svgnow = self.dirname + '_' + str(self.filenum) + '.svg'
             self.filenum += 1
 
-            # Delete the parts of other segmentations using mask
             segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
             cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
             segmask = cv2.resize(segmask_resized, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
             segmask = cv2.inRange(segmask, 1, 255)
 
+            segpath = list()
+            attributes = list()
+            svg_attributes = self.svg[2]
+            svg_attributes['viewBox'] = '{} {} {} {}'.format(x/self.t, y/self.t, w/self.t, h/self.t)
+
+            for i, path in enumerate(self.svg[0]):
+                p1x = path.point(0).real * self.t / self.xratio
+                p1y = path.point(0).imag * self.t / self.yratio
+                p2x = path.point(1).real * self.t / self.xratio
+                p2y = path.point(1).imag * self.t / self.yratio
+                incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
+                incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
+                if incnt1 >= 0 or incnt2 >= 0:
+                    segpath.append(path)
+                    attributes.append(self.svg[1][i])
+
+            # Delete the parts of other segmentations using mask
             now = self.hier[0][cidx][2]
             while(now != -1):
                 if self.hier[0][now][2] != -1:
@@ -720,6 +725,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     segmask_tmp = cv2.inRange(segmask_tmp, 1, 255)
                     segmask = cv2.bitwise_xor(segmask, segmask_tmp)
                     allmask = cv2.bitwise_or(allmask, segmask)
+                    dellist = list()
+                    for i, path in enumerate(segpath):
+                        p1x = path.point(0).real * self.t / self.xratio
+                        p1y = path.point(0).imag * self.t / self.yratio
+                        p2x = path.point(1).real * self.t / self.xratio
+                        p2y = path.point(1).imag * self.t / self.yratio
+                        incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
+                        incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
+                        if incnt1 >= 0 or incnt2 >= 0:
+                            dellist.append(i)
+                    for delnum in reversed(dellist):
+                        segpath.pop(delnum)
+                        attributes.pop(delnum)
                 now = self.hier[0][now][0]
 
             seg = cv2.bitwise_and(self.img, self.img, mask=segmask)
@@ -728,22 +746,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # Write the element into file system
             cv2.imwrite(os.path.join(self.dstdir, namenow), seg[y:y+h, x:x+w])
 
-            if self.svg is not None:
-                segpath = list()
-                attributes = list()
-                for i, path in enumerate(self.svg[0]):
-                    p1x = path.point(0).real * self.t
-                    p1y = path.point(0).imag * self.t
-                    p2x = path.point(1).real * self.t
-                    p2y = path.point(1).imag * self.t
-                    incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
-                    incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
-                    if incnt1 >= 0 or incnt2 >= 0:
-                        segpath.append(path)
-                        attributes.append(self.svg[1][i])
-                svg_attributes = self.svg[2]
-                svg_attributes['viewBox'] = '{} {} {} {}'.format(x/self.t, y/self.t, w/self.t, h/self.t)
-                wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(self.dstdir, svgnow))
+            wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(self.dstdir, svgnow))
 
         # Delete the element in the original image
         allmask = cv2.dilate(allmask, np.ones((10,10), np.uint8))
@@ -797,6 +800,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         xmax = -1
         ymax = -1
 
+        segpath = list()
+        attributes = list()
+
         for cidx, cnt in enumerate(self.contours):
             # If the flag for the contour is False, skip it
             if self.groupFlags[cidx] == False:
@@ -828,26 +834,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             allmask = cv2.bitwise_or(allmask, segmask)
 
-        # Write the element into file system
-        seg = cv2.bitwise_and(self.img, self.img, mask=allmask)
-        cv2.imwrite(os.path.join(self.dstdir, namenow), seg[ymin:ymax, xmin:xmax])
-
-        if self.svg is not None:
-            segpath = list()
-            attributes = list()
             for i, path in enumerate(self.svg[0]):
-                p1x = path.point(0).real * self.t
-                p1y = path.point(0).imag * self.t
-                p2x = path.point(1).real * self.t
-                p2y = path.point(1).imag * self.t
+                p1x = path.point(0).real * self.t / self.xratio
+                p1y = path.point(0).imag * self.t / self.yratio
+                p2x = path.point(1).real * self.t / self.xratio
+                p2y = path.point(1).imag * self.t / self.yratio
                 incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
                 incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
                 if incnt1 >= 0 or incnt2 >= 0:
                     segpath.append(path)
                     attributes.append(self.svg[1][i])
-            svg_attributes = self.svg[2]
-            svg_attributes['viewBox'] = '{} {} {} {}'.format(x/self.t, y/self.t, w/self.t, h/self.t)
-            wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(self.dstdir, svgnow))
+
+        # Write the element into file system
+        seg = cv2.bitwise_and(self.img, self.img, mask=allmask)
+        cv2.imwrite(os.path.join(self.dstdir, namenow), seg[ymin:ymax, xmin:xmax])
+
+        svg_attributes = self.svg[2]
+        svg_attributes['viewBox'] = '{} {} {} {}'.format(xmin/self.t, ymin/self.t, (xmax-xmin)/self.t, (ymax-ymin)/self.t)
+        wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(self.dstdir, svgnow))
 
         # Delete the element in the original image
         allmask = cv2.dilate(allmask, np.ones((10,10), np.uint8))
