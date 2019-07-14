@@ -20,7 +20,7 @@ SVGAttribute = ['about', 'baseProfile', 'class', 'content', 'contentScriptType',
 
 
 
-def saveImage(filenum, dstdir, dirname, resized, xratio, yratio, img, svg, t, contours, flags):
+def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, flags):
     # If there is no image loaded, return
     if img is None:
         return
@@ -45,11 +45,10 @@ def saveImage(filenum, dstdir, dirname, resized, xratio, yratio, img, svg, t, co
 
         # Get the position of each contour
         (x, y, w, h) = cv2.boundingRect(cnt)
-        if resized == True:
-            x = int(x * xratio)
-            w = int(w * xratio)
-            y = int(y * yratio)
-            h = int(h * yratio)
+        x = int(x * xratio)
+        w = int(w * xratio)
+        y = int(y * yratio)
+        h = int(h * yratio)
         if w <= 10 or h <= 10:
             continue
         namenow = dirname + '_' + str(filenum) + '.png'
@@ -57,14 +56,10 @@ def saveImage(filenum, dstdir, dirname, resized, xratio, yratio, img, svg, t, co
         filenum += 1
 
         # Delete the parts of other segmentations using mask
-        if resized == True:
-            segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-            cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
-            segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
-            segmask = cv2.inRange(segmask, 1, 255)
-        else:
-            segmask = np.zeros((img.shape[0], img.shape[1], 1), np.uint8)
-            cv2.drawContours(segmask, [cnt], 0, (255), -1)
+        segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
+        cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+        segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
+        segmask = cv2.inRange(segmask, 1, 255)
 
         seg = cv2.bitwise_and(img, img, mask=segmask)
 
@@ -107,7 +102,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.broken = False
         self.filenum = 1
         self.clicked = False
-        self.resized = False
         self.imageNum = 0
         self.imageNow = -1
         self.lastPoint = QPoint(0,0)
@@ -259,16 +253,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.achannel = self.img[:,:,-1]
             self.mask = cv2.inRange(self.achannel, 1, 255)
 
-            # Judge whether or not the image should be resized
-            if self.img.shape[0] > 2000 or self.img.shape[1] > 2000:
-                self.resized = True
-                self.xratio = self.img.shape[1] / 2000
-                self.yratio = self.img.shape[0] / 2000
-                self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-                self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-                self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-            else:
-                self.resized = False
+            # Resized the image
+            self.xratio = self.img.shape[1] / 2000
+            self.yratio = self.img.shape[0] / 2000
+            self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+            self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+            self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
 
             filedir, filename = os.path.split(self.fnames[self.imageNow])
             self.dirname, filetype = os.path.splitext(filename)
@@ -326,18 +316,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Closing the mask
         kernel = np.ones((self.vslider1.value(), self.vslider1.value()), np.uint8)
-        if self.resized == True:
-            imgmask = cv2.morphologyEx(self.mask_resized, cv2.MORPH_CLOSE, kernel)
-        else:
-            imgmask = cv2.morphologyEx(self.mask, cv2.MORPH_CLOSE, kernel)
+        imgmask = cv2.morphologyEx(self.mask_resized, cv2.MORPH_CLOSE, kernel)
 
         # Calculate the ratio between image and label
-        if self.resized == True:
-            xratio = 2000 / self.le1.width()
-            yratio = 2000 / self.le1.height()
-        else:
-            xratio = self.img.shape[1] / self.le1.width()
-            yratio = self.img.shape[0] / self.le1.height()
+        xratio = 2000 / self.le1.width()
+        yratio = 2000 / self.le1.height()
 
         # Get the contours of the image
         if cv2.__version__ >= '4.0.0':
@@ -351,16 +334,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             else:
                 bimg, self.contours, self.hier = cv2.findContours(imgmask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-        if self.resized == True:
-            canvas = np.zeros((2000, 2000, 4), np.uint8)
-        else:
-            canvas = np.zeros((self.img.shape[0], self.img.shape[1], 4), np.uint8)
+        canvas = np.zeros((2000, 2000, 4), np.uint8)
 
         # If the image has only the alpha channel, convert the image to a grey image
-        if self.resized == True:
-            canvasrgb = cv2.cvtColor(self.achannel_resized, cv2.COLOR_GRAY2RGB)
-        else:
-            canvasrgb = cv2.cvtColor(self.achannel, cv2.COLOR_GRAY2RGB)
+        canvasrgb = cv2.cvtColor(self.achannel_resized, cv2.COLOR_GRAY2RGB)
 
         # If the flags for contours are not inited, init them first
         if self.flagsInited == False:
@@ -426,10 +403,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         canvas[:,:,-1] = 255
 
         # Draw the image with rectangles in the label1
-        if self.resized == True:
-            image = QImage(canvas, 2000, 2000, QImage.Format_RGBA8888)
-        else:
-            image = QImage(canvas, self.img.shape[1], self.img.shape[0], QImage.Format_RGBA8888)
+        image = QImage(canvas, 2000, 2000, QImage.Format_RGBA8888)
         self.le1.setPixmap(QPixmap.fromImage(image.scaled(self.le1.size())))
 
 
@@ -444,10 +418,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
     def changeImage(self):
-        if self.resized == True:
-            allmask = np.zeros((2000, 2000, 1), np.uint8)
-        else:
-            allmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
+        allmask = np.zeros((2000, 2000, 1), np.uint8)
 
         for cidx, cnt in enumerate(self.contours):
             # If the flag for the contour is False, skip it
@@ -460,21 +431,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # Get the position of each contour
             (x, y, w, h) = cv2.boundingRect(cnt)
-            if self.resized == True:
-                x = int(x * self.xratio)
-                w = int(w * self.xratio)
-                y = int(y * self.yratio)
-                h = int(h * self.yratio)
+            x = int(x * self.xratio)
+            w = int(w * self.xratio)
+            y = int(y * self.yratio)
+            h = int(h * self.yratio)
             if w <= 10 or h <= 10:
                 continue
 
             # Delete the parts of other segmentations using mask
-            if self.resized == True:
-                segmask = np.zeros((2000, 2000, 1), np.uint8)
-                cv2.drawContours(segmask, [cnt], 0, (255), -1)
-            else:
-                segmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-                cv2.drawContours(segmask, [cnt], 0, (255), -1)
+            segmask = np.zeros((2000, 2000, 1), np.uint8)
+            cv2.drawContours(segmask, [cnt], 0, (255), -1)
 
             allmask = cv2.bitwise_or(allmask, segmask)
 
@@ -576,11 +542,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.achannel = self.img[:,:,-1]
         self.mask = cv2.inRange(self.achannel, 1, 255)
 
-        # Judge whether or not the image should be resized
-        if self.resized == True:
-            self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-            self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-            self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+        # Resized the image
+        self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+        self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+        self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
 
         self.drawPNG()
 
@@ -671,12 +636,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         (x, y, w, h) = cv2.boundingRect(cnt)
 
         # Calculate the position of clicked point in original image
-        if self.resized == True:
-            xnow = self.lastPoint.x() / self.le1.width() * 2000
-            ynow = self.lastPoint.y() / self.le1.height() * 2000
-        else:
-            xnow = self.lastPoint.x() / self.le1.width() * self.img.shape[1]
-            ynow = self.lastPoint.y() / self.le1.height() * self.img.shape[0]
+        xnow = self.lastPoint.x() / self.le1.width() * 2000
+        ynow = self.lastPoint.y() / self.le1.height() * 2000
 
         if xnow < 0 or ynow < 0 or xnow < x or xnow > x+w or ynow < y or ynow > y+h:
             return False
@@ -690,12 +651,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         (recx, recy, recw, rech) = self.rec
 
         # Calculate the ratio between image and label
-        if self.resized == True:
-            xratio = 2000 / self.le1.width()
-            yratio = 2000 / self.le1.height()
-        else:
-            xratio = self.img.shape[1] / self.le1.width()
-            yratio = self.img.shape[0] / self.le1.height()
+        xratio = 2000 / self.le1.width()
+        yratio = 2000 / self.le1.height()
 
         if x < recx*xratio or y < recy*yratio or x+w > (recx+recw)*xratio or y+h > (recy+rech)*yratio:
             return False
@@ -721,7 +678,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if self.broken == False:
                 self.changeImage()
                 filenum = self.filenum
-                p = multiprocessing.Process(target=saveImage, args=(filenum, self.dstdir, self.dirname, self.resized, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
+                p = multiprocessing.Process(target=saveImage, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
                 p.start()
 
                 for cidx, cnt in enumerate(self.contours):
@@ -749,7 +706,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.drawPNG()
 
         else:
-            p = multiprocessing.Process(target=saveImage, args=(self.filenum, self.dstdir, self.dirname, self.resized, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
+            p = multiprocessing.Process(target=saveImage, args=(self.filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
             self.le1.setPixmap(QPixmap())
             p.start()
             self.loadNextPNG()
@@ -783,11 +740,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # Get the position of each contour
             (x, y, w, h) = cv2.boundingRect(cnt)
-            if self.resized == True:
-                x = int(x * self.xratio)
-                w = int(w * self.xratio)
-                y = int(y * self.yratio)
-                h = int(h * self.yratio)
+            x = int(x * self.xratio)
+            w = int(w * self.xratio)
+            y = int(y * self.yratio)
+            h = int(h * self.yratio)
             if w <= 10 or h <= 10:
                 continue
             namenow = self.dirname + '_' + str(self.filenum) + '.png'
@@ -795,26 +751,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.filenum += 1
 
             # Delete the parts of other segmentations using mask
-            if self.resized == True:
-                segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-                cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
-                segmask = cv2.resize(segmask_resized, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
-                segmask = cv2.inRange(segmask, 1, 255)
-            else:
-                segmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-                cv2.drawContours(segmask, [cnt], 0, (255), -1)
+            segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
+            cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+            segmask = cv2.resize(segmask_resized, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
+            segmask = cv2.inRange(segmask, 1, 255)
 
             now = self.hier[0][cidx][2]
             while(now != -1):
                 if self.hier[0][now][2] != -1:
-                    if self.resized == True:
-                        segmask_resized_tmp = np.zeros((2000, 2000, 1), np.uint8)
-                        cv2.drawContours(segmask_resized_tmp, [self.contours[now]], 0, (255), -1)
-                        segmask_tmp = cv2.resize(segmask_resized_tmp, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
-                        segmask_tmp = cv2.inRange(segmask_tmp, 1, 255)
-                    else:
-                        segmask_tmp = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, (255), -1)
+                    segmask_resized_tmp = np.zeros((2000, 2000, 1), np.uint8)
+                    cv2.drawContours(segmask_resized_tmp, [self.contours[now]], 0, (255), -1)
+                    segmask_tmp = cv2.resize(segmask_resized_tmp, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
+                    segmask_tmp = cv2.inRange(segmask_tmp, 1, 255)
                     segmask = cv2.bitwise_xor(segmask, segmask_tmp)
                     allmask = cv2.bitwise_or(allmask, segmask)
                 now = self.hier[0][now][0]
@@ -857,11 +805,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.achannel = self.img[:,:,-1]
         self.mask = cv2.inRange(self.achannel, 1, 255)
 
-        # Judge whether or not the image should be resized
-        if self.resized == True:
-            self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-            self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-            self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+        # Resized the image
+        self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+        self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+        self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
 
 
 
@@ -906,11 +853,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # Get the position of each contour
             (x, y, w, h) = cv2.boundingRect(cnt)
-            if self.resized == True:
-                x = int(x * self.xratio)
-                w = int(w * self.xratio)
-                y = int(y * self.yratio)
-                h = int(h * self.yratio)
+            x = int(x * self.xratio)
+            w = int(w * self.xratio)
+            y = int(y * self.yratio)
+            h = int(h * self.yratio)
             if w <= 10 or h <= 10:
                 continue
 
@@ -920,14 +866,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ymax = max(y+h, ymax)
 
             # Delete the parts of other segmentations using mask
-            if self.resized == True:
-                segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-                cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
-                segmask = cv2.resize(segmask_resized, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
-                segmask = cv2.inRange(segmask, 1, 255)
-            else:
-                segmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-                cv2.drawContours(segmask, [cnt], 0, (255), -1)
+            segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
+            cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+            segmask = cv2.resize(segmask_resized, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
+            segmask = cv2.inRange(segmask, 1, 255)
 
             allmask = cv2.bitwise_or(allmask, segmask)
 
@@ -967,11 +909,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.achannel = self.img[:,:,-1]
         self.mask = cv2.inRange(self.achannel, 1, 255)
 
-        # Judge whether or not the image should be resized
-        if self.resized == True:
-            self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-            self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-            self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+        # Resized image
+        self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+        self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
+        self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
 
 
 
