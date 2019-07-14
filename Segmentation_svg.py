@@ -70,10 +70,10 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
             segpath = list()
             attributes = list()
             for i, path in enumerate(svg[0]):
-                p1x = path.point(0).real * t
-                p1y = path.point(0).imag * t
-                p2x = path.point(1).real * t
-                p2y = path.point(1).imag * t
+                p1x = path.point(0).real * t / xratio
+                p1y = path.point(0).imag * t / yratio
+                p2x = path.point(1).real * t / xratio
+                p2y = path.point(1).imag * t / yratio
                 incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
                 incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
                 if incnt1 >= 0 or incnt2 >= 0:
