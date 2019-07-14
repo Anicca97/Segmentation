@@ -20,7 +20,11 @@ SVGAttribute = ['about', 'baseProfile', 'class', 'content', 'contentScriptType',
 
 
 
-def saveImage(filenum, dstdir, dirname, xratio, yratio, resized, img, svg, t, contours, flags):
+def saveImage(filenum, dstdir, dirname, resized, xratio, yratio, img, svg, t, contours, flags):
+    # If there is no image loaded, return
+    if img is None:
+        return
+
     # Creat a directory for the segmentations of the image
     if filenum == 1:
         if os.path.exists(dstdir):
@@ -53,12 +57,6 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, resized, img, svg, t, co
         filenum += 1
 
         # Delete the parts of other segmentations using mask
-        segmask = np.zeros((img.shape[0], img.shape[1], 1), np.uint8)
-        cv2.drawContours(segmask, [cnt], 0, (255), -1)
-
-        seg = cv2.bitwise_and(img, img, mask=segmask)
-
-        # Delete the parts of other segmentations using mask
         if resized == True:
             segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
             cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
@@ -70,73 +68,6 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, resized, img, svg, t, co
 
         seg = cv2.bitwise_and(img, img, mask=segmask)
 
-        # Write the element into file system
-        cv2.imwrite(os.path.join(dstdir, namenow), seg[y:y+h, x:x+w])
-
-        if svg is not None:
-            segpath = list()
-            attributes = list()
-            for i, path in enumerate(svg[0]):
-                p1x = path.point(0).real * t
-                p1y = path.point(0).imag * t
-                p2x = path.point(1).real * t
-                p2y = path.point(1).imag * t
-                incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
-                incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
-                if incnt1 >= 0 or incnt2 >= 0:
-                    segpath.append(path)
-                    attributes.append(svg[1][i])
-            svg_attributes = svg[2]
-            svg_attributes['viewBox'] = '{} {} {} {}'.format(x/t, y/t, w/t, h/t)
-            wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
-
-
-
-def saveMultiImage(filenum, dstdir, dirname, resized, xratio, yratio, img, svg, t, contours):
-    # If there is no image loaded, return
-    if img is None:
-        return
-
-    # Creat a directory for the segmentations of the image
-    if filenum == 1:
-        if os.path.exists(dstdir):
-            temp_path = dstdir+'_tmp'
-            try:
-                os.renames(dstdir, temp_path)
-            except OSError as e:
-                if e.errno != errno.ENOENT:
-                    raise
-            else:
-                rmtree(temp_path)
-        os.mkdir(dstdir)
-
-    allmask = np.zeros((img.shape[0], img.shape[1], 1), np.uint8)
-
-    for cidx, cnt in enumerate(contours):
-        # Get the position of each contour
-        (x, y, w, h) = cv2.boundingRect(cnt)
-        if resized == True:
-            x = int(x * xratio)
-            w = int(w * xratio)
-            y = int(y * yratio)
-            h = int(h * yratio)
-        if w <= 10 or h <= 10:
-            continue
-        namenow = dirname + '_' + str(filenum) + '.png'
-        filenum += 1
-
-        # Delete the parts of other segmentations using mask
-        if resized == True:
-            segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-            cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
-            segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
-            segmask = cv2.inRange(segmask, 1, 255)
-        else:
-            segmask = np.zeros((img.shape[0], img.shape[1], 1), np.uint8)
-            cv2.drawContours(segmask, [cnt], 0, (255), -1)
-
-        seg = cv2.bitwise_and(img, img, mask=segmask)
-        allmask = cv2.bitwise_or(allmask, segmask)
         # Write the element into file system
         cv2.imwrite(os.path.join(dstdir, namenow), seg[y:y+h, x:x+w])
 
@@ -790,7 +721,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if self.broken == False:
                 self.changeImage()
                 filenum = self.filenum
-                p = multiprocessing.Process(target=saveImage, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.resized, self.img, self.svg, self.t, self.contours, self.flags))
+                p = multiprocessing.Process(target=saveImage, args=(filenum, self.dstdir, self.dirname, self.resized, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
                 p.start()
 
                 for cidx, cnt in enumerate(self.contours):
@@ -818,7 +749,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.drawPNG()
 
         else:
-            p = multiprocessing.Process(target=saveMultiImage, args=(self.filenum, self.dstdir, self.dirname, self.resized, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours,))
+            p = multiprocessing.Process(target=saveImage, args=(self.filenum, self.dstdir, self.dirname, self.resized, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
             self.le1.setPixmap(QPixmap())
             p.start()
             self.loadNextPNG()
