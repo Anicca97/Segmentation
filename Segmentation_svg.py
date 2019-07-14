@@ -85,7 +85,7 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
 
 
 
-def saveGroup(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, flags):
+def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, flags):
     flag = False
     for x in flags:
         flag = flag or x
@@ -163,6 +163,98 @@ def saveGroup(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
     svg_attributes = svg[2]
     svg_attributes['viewBox'] = '{} {} {} {}'.format(xmin/t, ymin/t, (xmax-xmin)/t, (ymax-ymin)/t)
     wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
+
+
+
+def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, flags, hier):
+    if img is None or svg is None:
+        return
+
+    # Creat a directory for the segmentations of the image
+    if filenum == 1:
+        if os.path.exists(dstdir):
+            temp_path = dstdir+'_tmp'
+            try:
+                os.renames(dstdir, temp_path)
+            except OSError as e:
+                if e.errno != errno.ENOENT:
+                    raise
+            else:
+                rmtree(temp_path)
+        os.mkdir(dstdir)
+
+    for cidx, cnt in enumerate(contours):
+        # If the flag for the contour is False, skip it
+        if flags[cidx] == False:
+            continue
+
+        # Only the contours without parents will be saved when they are broken
+        if hier[0][cidx][3] != -1:
+            continue
+
+        # Get the position of each contour
+        (x, y, w, h) = cv2.boundingRect(cnt)
+        x = int(x * xratio)
+        w = int(w * xratio)
+        y = int(y * yratio)
+        h = int(h * yratio)
+        if w <= 10 or h <= 10:
+            continue
+        namenow = dirname + '_' + str(filenum) + '.png'
+        svgnow = dirname + '_' + str(filenum) + '.svg'
+        filenum += 1
+
+        segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
+        cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+        segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
+        segmask = cv2.inRange(segmask, 1, 255)
+
+        segpath = list()
+        attributes = list()
+        svg_attributes = svg[2]
+        svg_attributes['viewBox'] = '{} {} {} {}'.format(x/t, y/t, w/t, h/t)
+
+        for i, path in enumerate(svg[0]):
+            p1x = path.point(0).real * t / xratio
+            p1y = path.point(0).imag * t / yratio
+            p2x = path.point(1).real * t / xratio
+            p2y = path.point(1).imag * t / yratio
+            incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
+            incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
+            if incnt1 >= 0 or incnt2 >= 0:
+                segpath.append(path)
+                attributes.append(svg[1][i])
+
+        # Delete the parts of other segmentations using mask
+        now = hier[0][cidx][2]
+        while(now != -1):
+            if hier[0][now][2] != -1:
+                segmask_resized_tmp = np.zeros((2000, 2000, 1), np.uint8)
+                cv2.drawContours(segmask_resized_tmp, [contours[now]], 0, (255), -1)
+                segmask_tmp = cv2.resize(segmask_resized_tmp, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
+                segmask_tmp = cv2.inRange(segmask_tmp, 1, 255)
+                segmask = cv2.bitwise_xor(segmask, segmask_tmp)
+                dellist = list()
+                for i, path in enumerate(segpath):
+                    p1x = path.point(0).real * t / xratio
+                    p1y = path.point(0).imag * t / yratio
+                    p2x = path.point(1).real * t / xratio
+                    p2y = path.point(1).imag * t / yratio
+                    incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
+                    incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
+                    if incnt1 >= 0 or incnt2 >= 0:
+                        dellist.append(i)
+                for delnum in reversed(dellist):
+                    segpath.pop(delnum)
+                    attributes.pop(delnum)
+            now = hier[0][now][0]
+
+        seg = cv2.bitwise_and(img, img, mask=segmask)
+
+        # Write the element into file system
+        cv2.imwrite(os.path.join(dstdir, namenow), seg[y:y+h, x:x+w])
+
+        wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
 
 
 
@@ -506,6 +598,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             segmask = np.zeros((2000, 2000, 1), np.uint8)
             cv2.drawContours(segmask, [cnt], 0, (255), -1)
 
+            if self.broken == True:
+                now = self.hier[0][cidx][2]
+                while(now != -1):
+                    if self.hier[0][now][2] != -1:
+                        segmask_tmp = np.zeros((2000, 2000, 1), np.uint8)
+                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, (255), -1)
+                        segmask = cv2.bitwise_xor(segmask, segmask_tmp)
+                    now = self.hier[0][now][0]
+
             allmask = cv2.bitwise_or(allmask, segmask)
 
         # Delete the element in the original image
@@ -556,7 +657,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     return
                 else:
                     filenum = self.filenum
-                    p = multiprocessing.Process(target=saveGroup, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
+                    p = multiprocessing.Process(target=saveGroupImage, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
                     p.start()
                     self.changeImage()
                     self.broken = False
@@ -689,14 +790,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             haveDone = self.flags[cidx] and haveDone
 
         if haveDone == False or self.broken == True:
+            filenum = self.filenum
             if self.broken == False:
-                filenum = self.filenum
                 p = multiprocessing.Process(target=saveImage, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
-                p.start()
-                self.changeImage()
-
             else:
-                self.saveBrokenImage()
+                p = multiprocessing.Process(target=saveBrokenImage, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags, self.hier))
+            p.start()
+            self.changeImage()
 
             self.group = False
             self.broken = False
@@ -709,122 +809,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.le1.setPixmap(QPixmap())
             p.start()
             self.loadNextPNG()
-
-
-
-    def saveBrokenImage(self):
-        if self.img is None or self.svg is None:
-            return
-
-        # Creat a directory for the segmentations of the image
-        if self.filenum == 1:
-            if os.path.exists(self.dstdir):
-                temp_path = self.dstdir+'_tmp'
-                try:
-                    os.renames(self.dstdir, temp_path)
-                except OSError as e:
-                    if e.errno != errno.ENOENT:
-                        raise
-                else:
-                    rmtree(temp_path)
-            os.mkdir(self.dstdir)
-
-        allmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-
-        for cidx, cnt in enumerate(self.contours):
-            # If the flag for the contour is False, skip it
-            if self.flags[cidx] == False:
-                continue
-
-            # Only the contours without parents will be saved when they are broken
-            if self.hier[0][cidx][3] != -1:
-                continue
-
-            # Get the position of each contour
-            (x, y, w, h) = cv2.boundingRect(cnt)
-            x = int(x * self.xratio)
-            w = int(w * self.xratio)
-            y = int(y * self.yratio)
-            h = int(h * self.yratio)
-            if w <= 10 or h <= 10:
-                continue
-            namenow = self.dirname + '_' + str(self.filenum) + '.png'
-            svgnow = self.dirname + '_' + str(self.filenum) + '.svg'
-            self.filenum += 1
-
-            segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-            cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
-            segmask = cv2.resize(segmask_resized, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
-            segmask = cv2.inRange(segmask, 1, 255)
-
-            segpath = list()
-            attributes = list()
-            svg_attributes = self.svg[2]
-            svg_attributes['viewBox'] = '{} {} {} {}'.format(x/self.t, y/self.t, w/self.t, h/self.t)
-
-            for i, path in enumerate(self.svg[0]):
-                p1x = path.point(0).real * self.t / self.xratio
-                p1y = path.point(0).imag * self.t / self.yratio
-                p2x = path.point(1).real * self.t / self.xratio
-                p2y = path.point(1).imag * self.t / self.yratio
-                incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
-                incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
-                if incnt1 >= 0 or incnt2 >= 0:
-                    segpath.append(path)
-                    attributes.append(self.svg[1][i])
-
-            # Delete the parts of other segmentations using mask
-            now = self.hier[0][cidx][2]
-            while(now != -1):
-                if self.hier[0][now][2] != -1:
-                    segmask_resized_tmp = np.zeros((2000, 2000, 1), np.uint8)
-                    cv2.drawContours(segmask_resized_tmp, [self.contours[now]], 0, (255), -1)
-                    segmask_tmp = cv2.resize(segmask_resized_tmp, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
-                    segmask_tmp = cv2.inRange(segmask_tmp, 1, 255)
-                    segmask = cv2.bitwise_xor(segmask, segmask_tmp)
-                    allmask = cv2.bitwise_or(allmask, segmask)
-                    dellist = list()
-                    for i, path in enumerate(segpath):
-                        p1x = path.point(0).real * self.t / self.xratio
-                        p1y = path.point(0).imag * self.t / self.yratio
-                        p2x = path.point(1).real * self.t / self.xratio
-                        p2y = path.point(1).imag * self.t / self.yratio
-                        incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
-                        incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
-                        if incnt1 >= 0 or incnt2 >= 0:
-                            dellist.append(i)
-                    for delnum in reversed(dellist):
-                        segpath.pop(delnum)
-                        attributes.pop(delnum)
-                now = self.hier[0][now][0]
-
-            seg = cv2.bitwise_and(self.img, self.img, mask=segmask)
-            allmask = cv2.bitwise_or(allmask, segmask)
-
-            # Write the element into file system
-            cv2.imwrite(os.path.join(self.dstdir, namenow), seg[y:y+h, x:x+w])
-
-            wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(self.dstdir, svgnow))
-
-        # Delete the element in the original image
-        allmask = cv2.dilate(allmask, np.ones((10,10), np.uint8))
-        allmask = cv2.bitwise_not(allmask)
-        self.img = cv2.bitwise_and(self.img, self.img, mask=allmask)
-
-        # Get the RGBA image from the BGRA image
-        self.img_cvt = np.copy(self.img)
-        tmp = np.copy(self.img[:,:,0])
-        self.img_cvt[:,:,0] = self.img[:,:,2]
-        self.img_cvt[:,:,2] = tmp
-
-        # Get the binary image
-        self.achannel = self.img[:,:,-1]
-        self.mask = cv2.inRange(self.achannel, 1, 255)
-
-        # Resized the image
-        self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-        self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-        self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
 
 
 
