@@ -85,6 +85,87 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
 
 
 
+def saveGroup(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, flags):
+    flag = False
+    for x in flags:
+        flag = flag or x
+    if flag == False:
+        return
+
+    # Creat a directory for the segmentations of the image
+    if filenum == 1:
+        if os.path.exists(dstdir):
+            temp_path = dstdir+'_tmp'
+            try:
+                os.renames(dstdir, temp_path)
+            except OSError as e:
+                if e.errno != errno.ENOENT:
+                    raise
+            else:
+                rmtree(temp_path)
+        os.mkdir(dstdir)
+
+    namenow = dirname + '_' + str(filenum) + '.png'
+    svgnow = dirname + '_' + str(filenum) + '.svg'
+    filenum += 1
+
+    allmask = np.zeros((img.shape[0], img.shape[1], 1), np.uint8)
+    xmin = 1e9
+    ymin = 1e9
+    xmax = -1
+    ymax = -1
+
+    segpath = list()
+    attributes = list()
+
+    for cidx, cnt in enumerate(contours):
+        # If the flag for the contour is False, skip it
+        if flags[cidx] == False:
+            continue
+
+        # Get the position of each contour
+        (x, y, w, h) = cv2.boundingRect(cnt)
+        x = int(x * xratio)
+        w = int(w * xratio)
+        y = int(y * yratio)
+        h = int(h * yratio)
+        if w <= 10 or h <= 10:
+            continue
+
+        xmin = min(x, xmin)
+        ymin = min(y, ymin)
+        xmax = max(x+w, xmax)
+        ymax = max(y+h, ymax)
+
+        # Delete the parts of other segmentations using mask
+        segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
+        cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+        segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
+        segmask = cv2.inRange(segmask, 1, 255)
+
+        allmask = cv2.bitwise_or(allmask, segmask)
+
+        for i, path in enumerate(svg[0]):
+            p1x = path.point(0).real * t / xratio
+            p1y = path.point(0).imag * t / yratio
+            p2x = path.point(1).real * t / xratio
+            p2y = path.point(1).imag * t / yratio
+            incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
+            incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
+            if incnt1 >= 0 or incnt2 >= 0:
+                segpath.append(path)
+                attributes.append(svg[1][i])
+
+    # Write the element into file system
+    seg = cv2.bitwise_and(img, img, mask=allmask)
+    cv2.imwrite(os.path.join(dstdir, namenow), seg[ymin:ymax, xmin:xmax])
+
+    svg_attributes = svg[2]
+    svg_attributes['viewBox'] = '{} {} {} {}'.format(xmin/t, ymin/t, (xmax-xmin)/t, (ymax-ymin)/t)
+    wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
+
+
+
 class MainWindow(QMainWindow, Ui_MainWindow):
 
 
@@ -216,8 +297,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         if self.group == True:
-            for i, flag in enumerate(self.groupFlags):
-                self.groupFlags[i] = not flag
+            for i, flag in enumerate(self.flags):
+                self.flags[i] = not flag
         else:
             for i, flag in enumerate(self.flags):
                 self.flags[i] = not flag
@@ -347,41 +428,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Draw the rectangle for each contour
         if self.broken == False:
             for cidx, cnt in enumerate(self.contours):
-                if self.group == False:
-                    # If the flag for the contour is False, skip it
-                    if self.flags[cidx] == False:
-                        continue
+                # If the flag for the contour is False, skip it
+                if self.flags[cidx] == False:
+                    continue
 
-                    (x, y, w, h) = cv2.boundingRect(cnt)
-                    if w <= 10 or h <= 10:
-                        continue
-                    cv2.drawContours(canvasrgb, self.contours, cidx, (255, 0, 0), thickness=10)
+                (x, y, w, h) = cv2.boundingRect(cnt)
+                if w <= 10 or h <= 10:
+                    continue
+                cv2.drawContours(canvasrgb, self.contours, cidx, (255, 0, 0), thickness=10)
 
-                    if self.rec != None:
-                        (x, y, w, h) = self.rec
-                        x = int(x * xratio)
-                        y = int(y * yratio)
-                        w = int(w * xratio)
-                        h = int(h * yratio)
-                        cv2.rectangle(canvasrgb, (x, y), (x+w, y+h), (0, 0, 255), thickness=5)
-
-                else:
-                    # If the flag for the contour is False, skip it
-                    if self.groupFlags[cidx] == False:
-                        continue
-
-                    (x, y, w, h) = cv2.boundingRect(cnt)
-                    if w <= 10 or h <= 10:
-                        continue
-                    cv2.drawContours(canvasrgb, self.contours, cidx, (255, 0, 255), thickness=10)
-
-                    if self.rec != None:
-                        (x, y, w, h) = self.rec
-                        x = int(x * xratio)
-                        y = int(y * yratio)
-                        w = int(w * xratio)
-                        h = int(h * yratio)
-                        cv2.rectangle(canvasrgb, (x, y), (x+w, y+h), (0, 0, 255), thickness=5)
+                if self.rec != None:
+                    (x, y, w, h) = self.rec
+                    x = int(x * xratio)
+                    y = int(y * yratio)
+                    w = int(w * xratio)
+                    h = int(h * yratio)
+                    cv2.rectangle(canvasrgb, (x, y), (x+w, y+h), (0, 0, 255), thickness=5)
 
         else:
             for cidx, cnt in enumerate(self.contours):
@@ -480,7 +542,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if self.group == True:
             if self.flagsInited == True:
-                self.groupFlags = [False] * len(self.flags)
+                self.flags = [False] * len(self.flags)
             self.broken = False
             self.ptn_group.setText(QCoreApplication.translate("MainWindow", "Finish"))
             self.drawPNG()
@@ -493,8 +555,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if ret == QMessageBox.Cancel:
                     return
                 else:
-                    self.saveGroup()
-                    self.groupFlags = None
+                    filenum = self.filenum
+                    p = multiprocessing.Process(target=saveGroup, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.svg, self.t, self.contours, self.flags))
+                    p.start()
+                    self.changeImage()
                     self.broken = False
                     self.le3.setText('Normal')
                     self.flagsInited = False
@@ -569,17 +633,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.rec != None and self.rec[2] > 10 and self.rec[3] > 10:
             for cidx, cnt in enumerate(self.contours):
                 if self.containRec(cnt):
-                    if self.group == True:
-                        self.groupFlags[cidx] = not self.groupFlags[cidx]
-                    else:
-                        self.flags[cidx] = not self.flags[cidx]
+                    self.flags[cidx] = not self.flags[cidx]
         else:
             for cidx, cnt in enumerate(self.contours):
                 if self.containPoint(cnt):
-                    if self.group == True:
-                        self.groupFlags[cidx] = not self.groupFlags[cidx]
-                    else:
-                        self.flags[cidx] = not self.flags[cidx]
+                    self.flags[cidx] = not self.flags[cidx]
 
         self.rec = None
         self.clicked = False
@@ -772,7 +830,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def saveGroup(self):
         flag = False
-        for x in self.groupFlags:
+        for x in self.flags:
             flag = flag or x
         if flag == False:
             return
@@ -805,11 +863,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         for cidx, cnt in enumerate(self.contours):
             # If the flag for the contour is False, skip it
-            if self.groupFlags[cidx] == False:
-                continue
-
-            # Only the contours without parents will be saved when they are broken
-            if self.broken == True and self.hier[0][cidx][3] != -1:
+            if self.flags[cidx] == False:
                 continue
 
             # Get the position of each contour
