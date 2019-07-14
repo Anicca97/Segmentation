@@ -119,7 +119,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.action_Save.triggered.connect(self.saveFile)
         self.action_Break.triggered.connect(self.breakContour)
         self.action_Quit.triggered.connect(self.close)
-        self.action_Reload.triggered.connect(self.reloadImage)
+        self.action_Reload.triggered.connect(self.loadPNG)
         self.action_Last.triggered.connect(self.loadLastPNG)
         self.action_Next.triggered.connect(self.loadNextPNG)
         self.action_Up.triggered.connect(self.upKernel)
@@ -132,7 +132,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.ptn_open.clicked.connect(self.showFileDialog)
         self.ptn_break.clicked.connect(self.breakContour)
         self.ptn_group.clicked.connect(self.groupContour)
-        self.ptn_reload.clicked.connect(self.reloadImage)
+        self.ptn_reload.clicked.connect(self.loadPNG)
         self.ptn_last.clicked.connect(self.loadLastPNG)
         self.ptn_next.clicked.connect(self.loadNextPNG)
         self.ptn_reverse.clicked.connect(self.reverseFlags)
@@ -268,6 +268,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             pdfname = self.dstdir + '.pdf'
             svgname = self.dstdir + '.svg'
 
+            # Convert eps to svg
             epstopdf_exist = False
             pdf2svg_exist = False
             for cmdpath in os.environ['PATH'].split(':'):
@@ -502,52 +503,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.le3.setText('Normal')
         else:
             self.le3.setText('Group')
-
-
-
-    def reloadImage(self):
-        if self.imageNow <= -1 or self.imageNow >= self.imageNum:
-            self.le1.setPixmap(QPixmap())
-            self.img = None
-            return
-
-        if os.path.exists(self.dstdir):
-            temp_path = self.dstdir+'_tmp'
-            try:
-                os.renames(self.dstdir, temp_path)
-            except OSError as e:
-                if e.errno != errno.ENOENT:
-                    raise
-            else:
-                rmtree(temp_path)
-
-        self.group = False
-        self.broken = False
-        self.le3.setText('Normal')
-        self.flagsInited = False
-        self.filenum = 1
-        self.lastPoint = QPoint(0,0)
-
-        self.img = cv2.imread(self.fnames[self.imageNow], cv2.IMREAD_UNCHANGED)
-        if self.img is None:
-            return
-
-        # Get the RGBA image from the BGRA image
-        self.img_cvt = np.copy(self.img)
-        tmp = np.copy(self.img[:,:,0])
-        self.img_cvt[:,:,0] = self.img[:,:,2]
-        self.img_cvt[:,:,2] = tmp
-
-        # Get the binary image
-        self.achannel = self.img[:,:,-1]
-        self.mask = cv2.inRange(self.achannel, 1, 255)
-
-        # Resized the image
-        self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-        self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-        self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-
-        self.drawPNG()
 
 
 
