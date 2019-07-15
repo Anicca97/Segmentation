@@ -269,6 +269,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.img = None
         self.svg = None
         self.rec = None
+        self.flags = None
         self.group = False
         self.xratio = 1.0
         self.yratio = 1.0
@@ -674,6 +675,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def sliderChanged(self):
         self.flagsInited = False
+        self.flags = None
         self.drawPNG()
 
 
@@ -690,15 +692,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.flagsInited == False:
             return
 
+        if self.le1.underMouse() == False:
+            return
+
         self.lastPoint = self.le1.mapFromParent(event.pos())
-        if self.lastPoint.x() < 0:
-            self.lastPoint.setX(0)
-        if self.lastPoint.y() < 0:
-            self.lastPoint.setY(0)
-        if self.lastPoint.x() > self.le1.width():
-            self.lastPoint.setX(self.le1.width())
-        if self.lastPoint.y() > self.le1.height():
-            self.lastPoint.setY(self.le1.height())
         self.clicked = True
 
 
@@ -709,14 +706,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if self.clicked == True:
             posNow = self.le1.mapFromParent(event.pos())
-            if posNow.x() < 0:
-                posNow.setX(0)
-            if posNow.y() < 0:
-                posNow.setY(0)
-            if posNow.x() > self.le1.width():
-                posNow.setX(self.le1.width())
-            if posNow.y() > self.le1.height():
-                posNow.setY(self.le1.height())
             x = min(posNow.x(), self.lastPoint.x())
             y = min(posNow.y(), self.lastPoint.y())
             w = abs(self.lastPoint.x() - posNow.x())
@@ -729,6 +718,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def mouseReleaseEvent(self, event):
         if self.flagsInited == False:
+            return
+
+        if self.clicked == False:
             return
 
         if self.rec != None and self.rec[2] > 10 and self.rec[3] > 10:
@@ -749,6 +741,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # Judge whether or not the point is in the rectangle of the contour
     def containPoint(self, cnt):
         (x, y, w, h) = cv2.boundingRect(cnt)
+
+        if self.lastPoint.x() > self.le1.width() or self.lastPoint.y() > self.le1.height():
+            return False
 
         # Calculate the position of clicked point in original image
         xnow = self.lastPoint.x() / self.le1.width() * 2000
@@ -813,9 +808,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-
+    multiprocessing.freeze_support()
     multiprocessing.set_start_method('spawn')
+
+    app = QApplication(sys.argv)
 
     window = MainWindow()
     window.show()
