@@ -81,7 +81,8 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
                     attributes.append(svg[1][i])
             svg_attributes = svg[2]
             svg_attributes['viewBox'] = '{} {} {} {}'.format(x/t, y/t, w/t, h/t)
-            wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
+            if len(segpath) > 0:
+                wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
 
 
 
@@ -162,7 +163,8 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
 
     svg_attributes = svg[2]
     svg_attributes['viewBox'] = '{} {} {} {}'.format(xmin/t, ymin/t, (xmax-xmin)/t, (ymax-ymin)/t)
-    wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
+    if len(segpath) > 0:
+        wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
 
 
 
@@ -254,7 +256,8 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
         # Write the element into file system
         cv2.imwrite(os.path.join(dstdir, namenow), seg[y:y+h, x:x+w])
 
-        wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
+        if len(segpath) > 0:
+            wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
 
 
 
