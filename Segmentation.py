@@ -53,7 +53,7 @@ def saveResizedImage(filenum, dstdir, dirname, xratio, yratio, img, contours, fl
         seg = cv2.bitwise_and(img, img, mask=segmask)
 
         # Write the element into file system
-        cv2.imwrite(os.path.join(dstdir, namenow), seg[y:y+h, x:x+w])
+        cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(dstdir, namenow))
 
 
 
@@ -103,7 +103,7 @@ def saveMultiImage(filenum, dstdir, dirname, resized, xratio, yratio, img, conto
         seg = cv2.bitwise_and(img, img, mask=segmask)
         allmask = cv2.bitwise_or(allmask, segmask)
         # Write the element into file system
-        cv2.imwrite(os.path.join(dstdir, namenow), seg[y:y+h, x:x+w])
+        cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(dstdir, namenow))
 
 
 
@@ -260,7 +260,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         if self.fnames[self.imageNow] != '':
-            self.img = cv2.imread(self.fnames[self.imageNow], cv2.IMREAD_UNCHANGED)
+            self.img = cv2.imdecode(np.fromfile(self.fnames[self.imageNow], dtype=np.uint8), cv2.IMREAD_UNCHANGED)
             if self.img is None:
                 return
 
@@ -533,7 +533,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             allmask = cv2.bitwise_or(allmask, segmask)
 
             # Write the element into file system
-            cv2.imwrite(os.path.join(self.dstdir, namenow), seg[y:y+h, x:x+w])
+            cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(self.dstdir, namenow))
 
         # Delete the element in the original image
         allmask = cv2.dilate(allmask, np.ones((10,10), np.uint8))
@@ -618,7 +618,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             allmask = cv2.bitwise_or(allmask, segmask)
 
             # Write the element into file system
-            cv2.imwrite(os.path.join(self.dstdir, namenow), seg[y:y+h, x:x+w])
+            cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(self.dstdir, namenow))
 
         # Delete the element in the original image
         allmask = cv2.dilate(allmask, np.ones((10,10), np.uint8))
@@ -764,7 +764,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.filenum = 1
         self.lastPoint = QPoint(0,0)
 
-        self.img = cv2.imread(self.fnames[self.imageNow], cv2.IMREAD_UNCHANGED)
+        self.img = cv2.imdecode(np.fromfile(self.fnames[self.imageNow], dtype=np.uint8), cv2.IMREAD_UNCHANGED)
         if self.img is None:
             return
 
@@ -972,7 +972,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Write the element into file system
         seg = cv2.bitwise_and(self.img, self.img, mask=allmask)
-        cv2.imwrite(os.path.join(self.dstdir, namenow), seg[ymin:ymax, xmin:xmax])
+        cv2.imencode('.png', seg[ymin:ymax, xmin:xmax])[1].tofile(os.path.join(self.dstdir, namenow))
 
         # Delete the element in the original image
         allmask = cv2.dilate(allmask, np.ones((10,10), np.uint8))
