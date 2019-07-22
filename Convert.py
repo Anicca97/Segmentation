@@ -119,9 +119,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 msg.buttonClicked.connect(msg.close)
                 msg.exec_()
             else:
-                os.system("inkscape -z {} -e {}".format(epsname, pngname))
+                # os.system("inkscape -z {} -e {}".format(epsname, pngname))
                 os.system("epstopdf {}".format(epsname))
                 os.system("pdf2svg {} {}".format(pdfname, svgname))
+                os.system("inkscape -z {} -e {}".format(svgname, pngname))
 
         else:
             msg = QMessageBox()
