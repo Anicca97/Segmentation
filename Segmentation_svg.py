@@ -441,29 +441,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.dirname, filetype = os.path.splitext(filename)
             self.dstdir = os.path.join(filedir, self.dirname)
 
-            epsname = self.dstdir + '.eps'
-            pdfname = self.dstdir + '.pdf'
+#            epsname = self.dstdir + '.eps'
+#            pdfname = self.dstdir + '.pdf'
             svgname = self.dstdir + '.svg'
 
-            # Convert eps to svg
-            epstopdf_exist = False
-            pdf2svg_exist = False
-            for cmdpath in os.environ['PATH'].split(':'):
-                if os.path.isdir(cmdpath) and 'epstopdf' in os.listdir(cmdpath):
-                    epstopdf_exist = True
-                if os.path.isdir(cmdpath) and 'pdf2svg' in os.listdir(cmdpath):
-                    pdf2svg_exist = True
-            if not epstopdf_exist or not pdf2svg_exist:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Critical)
-                msg.setWindowTitle("Environment Error")
-                msg.setText("Please check epstopdf and pdf2svg!")
-                msg.setStandardButtons(QMessageBox.Ok)
-                msg.buttonClicked.connect(msg.close)
-                msg.exec_()
-            else:
-                os.system("epstopdf {}".format(epsname))
-                os.system("pdf2svg {} {}".format(pdfname, svgname))
+#            # Convert eps to svg
+#            epstopdf_exist = False
+#            pdf2svg_exist = False
+#            for cmdpath in os.environ['PATH'].split(':'):
+#                if os.path.isdir(cmdpath) and 'epstopdf' in os.listdir(cmdpath):
+#                    epstopdf_exist = True
+#                if os.path.isdir(cmdpath) and 'pdf2svg' in os.listdir(cmdpath):
+#                    pdf2svg_exist = True
+#            if not epstopdf_exist or not pdf2svg_exist:
+#                msg = QMessageBox()
+#                msg.setIcon(QMessageBox.Critical)
+#                msg.setWindowTitle("Environment Error")
+#                msg.setText("Please check epstopdf and pdf2svg!")
+#                msg.setStandardButtons(QMessageBox.Ok)
+#                msg.buttonClicked.connect(msg.close)
+#                msg.exec_()
+#            else:
+#                os.system("epstopdf {}".format(epsname))
+#                os.system("pdf2svg {} {}".format(pdfname, svgname))
 
             self.svg = svg2paths2(svgname)
             if self.svg is not None:
