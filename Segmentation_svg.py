@@ -12,8 +12,8 @@ from PyQt5.QtCore import *
 from svgwrite import Drawing
 from PyQt5.QtWidgets import *
 from MyMainWindow import Ui_MainWindow
-from xml.dom.minidom import parse, parseString
 from svgpathtools import wsvg, parse_path
+from xml.dom.minidom import parse, parseString
 
 
 SVGAttribute = ['about', 'baseProfile', 'class', 'content', 'contentScriptType', 'datatype',
@@ -176,7 +176,7 @@ def find_paths(doc,
         plinnodes = doc.getElementsByTagName('polyline')
         plins = [dom2dict(el) for el in plinnodes]
         d_strings += [polyline2pathd(pl['points']) for pl in plins]
-        pathnodes += plinnodes
+        pathnodes.extend(plinnodes)
 
     # Use minidom to extract polygon strings from input SVG, convert to
     # path strings, add to list
@@ -184,32 +184,32 @@ def find_paths(doc,
         pgonnodes = doc.getElementsByTagName('polygon')
         pgons = [dom2dict(el) for el in pgonnodes]
         d_strings += [polygon2pathd(pg['points']) for pg in pgons]
-        pathnodes += pgonnodes
+        pathnodes.extend(pgonnodes)
 
     if convert_lines_to_paths:
         linenodes = doc.getElementsByTagName('line')
         lines = [dom2dict(el) for el in linenodes]
         d_strings += [('M' + l['x1'] + ' ' + l['y1'] +
                        'L' + l['x2'] + ' ' + l['y2']) for l in lines]
-        pathnodes += linenodes
+        pathnodes.extend(linenodes)
 
     if convert_ellipses_to_paths:
         ellipsenodes = doc.getElementsByTagName('ellipse')
         ellipses = [dom2dict(el) for el in ellipsenodes]
         d_strings += [ellipse2pathd(e) for e in ellipses]
-        pathnodes += ellipsenodes
+        pathnodes.extend(ellipsenodes)
 
     if convert_circles_to_paths:
         circlenodes = doc.getElementsByTagName('circle')
         circles = [dom2dict(el) for el in circlenodes]
         d_strings += [ellipse2pathd(c) for c in circles]
-        pathnodes += circlenodes
+        pathnodes.extend(circlenodes)
 
     if convert_rectangles_to_paths:
         rectanglenodes = doc.getElementsByTagName('rect')
         rectangles = [dom2dict(el) for el in rectanglenodes]
         d_strings += [rect2pathd(r) for r in rectangles]
-        pathnodes += rectanglenodes
+        pathnodes.extend(rectanglenodes)
 
     path_list = [parse_path(d) for d in d_strings]
     return pathnodes, path_list
@@ -226,7 +226,7 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
     if img is None:
         return
 
-    # Creat a directory for the segmentations of the image
+    # Creat a directory for the segmentation of the image
     if filenum == 1:
         if os.path.exists(dstdir):
             temp_path = dstdir+'_tmp'
@@ -256,7 +256,7 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
         svgnow = dirname + '_' + str(filenum) + '.svg'
         filenum += 1
 
-        # Delete the parts of other segmentations using mask
+        # Delete the parts of other segmentation using mask
         segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
         cv2.drawContours(segmask_resized, [cnt], 0, 255, -1)
         segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
@@ -272,14 +272,12 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
             pathnodes, paths = find_paths(g)
             segpath = list()
             for i, path in enumerate(paths):
-                p1x = path.point(0).real * t / xratio
-                p1y = path.point(0).imag * t / yratio
-                p2x = path.point(1).real * t / xratio
-                p2y = path.point(1).imag * t / yratio
-                incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
-                incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
-                if incnt1 >= 0 or incnt2 >= 0:
-                    segpath.append(find_parent(pathnodes[i]))
+                for j in range(100):
+                    px = path.point((j+1)/100-0.01).real * t / xratio
+                    py = path.point((j+1)/100-0.01).imag * t / yratio
+                    if cv2.pointPolygonTest(cnt, (px, py), False) >= 0:
+                        segpath.append(find_parent(pathnodes[i]))
+                        break
             svg_attributes = svg[2]
             svg_attributes['viewBox'] = '{} {} {} {}'.format(x/t, y/t, w/t, h/t)
             if len(segpath) > 0:
@@ -294,7 +292,7 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
     if not flag:
         return
 
-    # Creat a directory for the segmentations of the image
+    # Create a directory for the segmentation of the image
     if filenum == 1:
         if os.path.exists(dstdir):
             temp_path = dstdir+'_tmp'
@@ -352,8 +350,8 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
             p1y = path.point(0).imag * t / yratio
             p2x = path.point(1).real * t / xratio
             p2y = path.point(1).imag * t / yratio
-            incnt1 = cv2.pointPolygonTest(cnt, (p1x ,p1y), False)
-            incnt2 = cv2.pointPolygonTest(cnt, (p2x ,p2y), False)
+            incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
+            incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
             if incnt1 >= 0 or incnt2 >= 0:
                 segpath.append(path)
                 attributes.append(svg[1][i])
@@ -587,7 +585,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.le3.setText('Normal')
         self.flagsInited = False
         self.filenum = 1
-        self.lastPoint = QPoint(0,0)
+        self.lastPoint = QPoint(0, 0)
 
         if self.imageNow <= -1 or self.imageNow >= self.imageNum:
             self.le1.setPixmap(QPixmap())
@@ -601,12 +599,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # Get the RGBA image from the BGRA image
             self.img_cvt = np.copy(self.img)
-            tmp = np.copy(self.img[:,:,0])
-            self.img_cvt[:,:,0] = self.img[:,:,2]
-            self.img_cvt[:,:,2] = tmp
+            tmp = np.copy(self.img[:, :, 0])
+            self.img_cvt[:, :, 0] = self.img[:, :, 2]
+            self.img_cvt[:, :, 2] = tmp
 
             # Get the binary image
-            self.achannel = self.img[:,:,-1]
+            self.achannel = self.img[:, :, -1]
             self.mask = cv2.inRange(self.achannel, 1, 255)
 
             # Resized the image
@@ -713,8 +711,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         now = self.hier[0][now][0]
 
         # Change the alpha channel value to 255 to show the rectangles
-        canvas[:,:,:-1] = np.copy(canvasrgb)
-        canvas[:,:,-1] = 255
+        canvas[:, :, :-1] = np.copy(canvasrgb)
+        canvas[:, :, -1] = 255
 
         # Draw the image with rectangles in the label1
         image = QImage(canvas, 2000, 2000, QImage.Format_RGBA8888)
@@ -751,14 +749,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # Delete the parts of other segmentations using mask
             segmask = np.zeros((2000, 2000, 1), np.uint8)
-            cv2.drawContours(segmask, [cnt], 0, (255), -1)
+            cv2.drawContours(segmask, [cnt], 0, 255, -1)
 
             if self.broken:
                 now = self.hier[0][cidx][2]
                 while now != -1:
                     if self.hier[0][now][2] != -1:
                         segmask_tmp = np.zeros((2000, 2000, 1), np.uint8)
-                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, (255), -1)
+                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, 255, -1)
                         segmask = cv2.bitwise_xor(segmask, segmask_tmp)
                     now = self.hier[0][now][0]
 
