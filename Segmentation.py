@@ -3,7 +3,6 @@ import os
 import cv2
 import sys
 import errno
-import argparse
 import numpy as np
 import multiprocessing
 from shutil import rmtree
@@ -13,9 +12,8 @@ from PyQt5.QtWidgets import *
 from MyMainWindow import Ui_MainWindow
 
 
-
 def saveResizedImage(filenum, dstdir, dirname, xratio, yratio, img, contours, flags):
-    # Creat a directory for the segmentations of the image
+    # Create a directory for the segmentation of the image
     if filenum == 1:
         if os.path.exists(dstdir):
             temp_path = dstdir+'_tmp'
@@ -30,7 +28,7 @@ def saveResizedImage(filenum, dstdir, dirname, xratio, yratio, img, contours, fl
 
     for cidx, cnt in enumerate(contours):
         # If the flag for the contour is False, skip it
-        if flags[cidx] == False:
+        if not flags[cidx]:
             continue
 
         # Get the position of each contour
@@ -44,9 +42,9 @@ def saveResizedImage(filenum, dstdir, dirname, xratio, yratio, img, contours, fl
         namenow = dirname + '_' + str(filenum) + '.png'
         filenum += 1
 
-        # Delete the parts of other segmentations using mask
+        # Delete the parts of other segmentation using mask
         segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-        cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+        cv2.drawContours(segmask_resized, [cnt], 0, 255, -1)
         segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
         segmask = cv2.inRange(segmask, 1, 255)
         
@@ -56,13 +54,12 @@ def saveResizedImage(filenum, dstdir, dirname, xratio, yratio, img, contours, fl
         cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(dstdir, namenow))
 
 
-
 def saveMultiImage(filenum, dstdir, dirname, resized, xratio, yratio, img, contours):
     # If there is no image loaded, return
     if img is None:
         return
 
-    # Creat a directory for the segmentations of the image
+    # Create a directory for the segmentation of the image
     if filenum == 1:
         if os.path.exists(dstdir):
             temp_path = dstdir+'_tmp'
@@ -80,7 +77,7 @@ def saveMultiImage(filenum, dstdir, dirname, resized, xratio, yratio, img, conto
     for cidx, cnt in enumerate(contours):
         # Get the position of each contour
         (x, y, w, h) = cv2.boundingRect(cnt)
-        if resized == True:
+        if resized:
             x = int(x * xratio)
             w = int(w * xratio)
             y = int(y * yratio)
@@ -90,15 +87,15 @@ def saveMultiImage(filenum, dstdir, dirname, resized, xratio, yratio, img, conto
         namenow = dirname + '_' + str(filenum) + '.png'
         filenum += 1
 
-        # Delete the parts of other segmentations using mask
-        if resized == True:
+        # Delete the parts of other segmentation using mask
+        if resized:
             segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-            cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+            cv2.drawContours(segmask_resized, [cnt], 0, 255, -1)
             segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
             segmask = cv2.inRange(segmask, 1, 255)
         else:
             segmask = np.zeros((img.shape[0], img.shape[1], 1), np.uint8)
-            cv2.drawContours(segmask, [cnt], 0, (255), -1)
+            cv2.drawContours(segmask, [cnt], 0, 255, -1)
 
         seg = cv2.bitwise_and(img, img, mask=segmask)
         allmask = cv2.bitwise_or(allmask, segmask)
@@ -106,10 +103,7 @@ def saveMultiImage(filenum, dstdir, dirname, resized, xratio, yratio, img, conto
         cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(dstdir, namenow))
 
 
-
 class MainWindow(QMainWindow, Ui_MainWindow):
-
-
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -132,12 +126,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.setupAction()
 
-
-
     def setupAction(self):
         # Set the menus
         self.action_Open.triggered.connect(self.showFileDialog)
-        self.action_OpenFile.triggered.connect(self.readFile)
+        self.action_OpenFolder.triggered.connect(self.readFolder)
         self.action_Save.triggered.connect(self.saveFile)
         self.action_Break.triggered.connect(self.breakContour)
         self.action_Quit.triggered.connect(self.close)
@@ -158,7 +150,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.ptn_last.clicked.connect(self.loadLastPNG)
         self.ptn_next.clicked.connect(self.loadNextPNG)
         self.ptn_reverse.clicked.connect(self.reverseFlags)
-        self.ptn_openfile.clicked.connect(self.readFile)
+        self.ptn_openfolder.clicked.connect(self.readFolder)
 
         # Set the labels
         self.le3.setText('Normal')
@@ -166,8 +158,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Set the sliders
         self.vslider1.setValue(25)
         self.vslider1.valueChanged.connect(self.sliderChanged)
-
-
 
     def showFileDialog(self):
         # Get images' path and name
@@ -181,9 +171,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # Load image
             self.loadNextPNG()
 
-
-
-    def readFile(self):
+    def readFolder(self):
         # Get images' path and name
         options = QFileDialog.Options() | QFileDialog.DontUseNativeDialog | QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
         fdir = QFileDialog.getExistingDirectory(self, 'Open file', '', options=options)
@@ -201,21 +189,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 # Load image
                 self.loadNextPNG()
 
-
-
     def loadLastPNG(self):
         if self.imageNow > -1:
             self.imageNow -= 1
             self.loadPNG()
 
-
-
     def loadNextPNG(self):
         if self.imageNow < self.imageNum:
             self.imageNow += 1
             self.loadPNG()
-
-
 
     def upKernel(self):
         value = self.vslider1.value()
@@ -223,29 +205,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             value += 1
         self.vslider1.setValue(value)
 
-
-
     def downKernel(self):
         value = self.vslider1.value()
         if value > 0:
             value -= 1
         self.vslider1.setValue(value)
 
-
-
     def reverseFlags(self):
-        if self.flagsInited == False:
+        if not self.flagsInited:
             return
 
-        if self.group == True:
+        if self.group:
             for i, flag in enumerate(self.groupFlags):
                 self.groupFlags[i] = not flag
         else:
             for i, flag in enumerate(self.flags):
                 self.flags[i] = not flag
         self.drawPNG()
-
-
 
     def loadPNG(self):
         self.group = False
@@ -267,12 +243,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # Get the RGBA image from the BGRA image
             self.img_cvt = np.copy(self.img)
-            tmp = np.copy(self.img[:,:,0])
-            self.img_cvt[:,:,0] = self.img[:,:,2]
-            self.img_cvt[:,:,2] = tmp
+            tmp = np.copy(self.img[:, :, 0])
+            self.img_cvt[:, :, 0] = self.img[:, :, 2]
+            self.img_cvt[:, :, 2] = tmp
 
             # Get the binary image
-            self.achannel = self.img[:,:,-1]
+            self.achannel = self.img[:, :, -1]
             self.mask = cv2.inRange(self.achannel, 1, 255)
 
             # Judge whether or not the image should be resized
@@ -302,8 +278,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             msg.buttonClicked.connect(msg.close)
             msg.exec_()
 
-
-
     def drawPNG(self):
         # Check whether or not the image had been read
         if self.img is None:
@@ -311,13 +285,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Closing the mask
         kernel = np.ones((self.vslider1.value(), self.vslider1.value()), np.uint8)
-        if self.resized == True:
+        if self.resized:
             imgmask = cv2.morphologyEx(self.mask_resized, cv2.MORPH_CLOSE, kernel)
         else:
             imgmask = cv2.morphologyEx(self.mask, cv2.MORPH_CLOSE, kernel)
 
         # Calculate the ratio between image and label
-        if self.resized == True:
+        if self.resized:
             xratio = 2000 / self.le1.width()
             yratio = 2000 / self.le1.height()
         else:
@@ -326,37 +300,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Get the contours of the image
         if cv2.__version__ >= '4.0.0':
-            if self.broken == False:
+            if not self.broken:
                 self.contours, self.hier = cv2.findContours(imgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             else:
                 self.contours, self.hier = cv2.findContours(imgmask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         else:
-            if self.broken == False:
+            if not self.broken:
                 bimg, self.contours, self.hier = cv2.findContours(imgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             else:
                 bimg, self.contours, self.hier = cv2.findContours(imgmask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-        if self.resized == True:
+        if self.resized:
             canvas = np.zeros((2000, 2000, 4), np.uint8)
         else:
             canvas = np.zeros((self.img.shape[0], self.img.shape[1], 4), np.uint8)
 
         # If the image has only the alpha channel, convert the image to a grey image
-        if self.resized == True:
+        if self.resized:
             canvasrgb = cv2.cvtColor(self.achannel_resized, cv2.COLOR_GRAY2RGB)
         else:
             canvasrgb = cv2.cvtColor(self.achannel, cv2.COLOR_GRAY2RGB)
 
         # If the flags for contours are not inited, init them first
-        if self.flagsInited == False:
+        if not self.flagsInited:
             self.initFlag()
 
         # Draw the rectangle for each contour
-        if self.broken == False:
+        if not self.broken:
             for cidx, cnt in enumerate(self.contours):
-                if self.group == False:
+                if not self.group:
                     # If the flag for the contour is False, skip it
-                    if self.flags[cidx] == False:
+                    if not self.flags[cidx]:
                         continue
 
                     (x, y, w, h) = cv2.boundingRect(cnt)
@@ -364,7 +338,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         continue
                     cv2.drawContours(canvasrgb, self.contours, cidx, (255, 0, 0), thickness=10)
 
-                    if self.rec != None:
+                    if self.rec is not None:
                         (x, y, w, h) = self.rec
                         x = int(x * xratio)
                         y = int(y * yratio)
@@ -374,7 +348,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                 else:
                     # If the flag for the contour is False, skip it
-                    if self.groupFlags[cidx] == False:
+                    if not self.groupFlags[cidx]:
                         continue
 
                     (x, y, w, h) = cv2.boundingRect(cnt)
@@ -382,7 +356,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         continue
                     cv2.drawContours(canvasrgb, self.contours, cidx, (255, 0, 255), thickness=10)
 
-                    if self.rec != None:
+                    if self.rec is not None:
                         (x, y, w, h) = self.rec
                         x = int(x * xratio)
                         y = int(y * yratio)
@@ -393,7 +367,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             for cidx, cnt in enumerate(self.contours):
                 # If the flag for the contour is False, skip it
-                if self.flags[cidx] == False:
+                if not self.flags[cidx]:
                     continue
 
                 # Only the contours without parents will be drawed
@@ -401,23 +375,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     cv2.drawContours(canvasrgb, self.contours, cidx, (255, 0, 0), thickness=10)
 
                     now = self.hier[0][cidx][2]
-                    while(now != -1):
+                    while now != -1:
                         if self.hier[0][now][2] != -1:
                             cv2.drawContours(canvasrgb, self.contours, now, (0, 255, 0), thickness=10)
                         now = self.hier[0][now][0]
 
         # Change the alpha channel value to 255 to show the rectangles
-        canvas[:,:,:-1] = np.copy(canvasrgb)
-        canvas[:,:,-1] = 255
+        canvas[:, :, :-1] = np.copy(canvasrgb)
+        canvas[:, :, -1] = 255
 
         # Draw the image with rectangles in the label1
-        if self.resized == True:
+        if self.resized:
             image = QImage(canvas, 2000, 2000, QImage.Format_RGBA8888)
         else:
             image = QImage(canvas, self.img.shape[1], self.img.shape[0], QImage.Format_RGBA8888)
         self.le1.setPixmap(QPixmap.fromImage(image.scaled(self.le1.size())))
-
-
 
     def initFlag(self):
         cntnum = 0
@@ -426,8 +398,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.flags = [True] * cntnum
         self.flagsInited = True
 
-
-
     def saveFile(self):
         if self.imageNow <= -1 or self.imageNow >= self.imageNum:
             self.le1.setPixmap(QPixmap())
@@ -435,15 +405,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         # If there is no image loaded, return
-        if self.img is None or self.flagsInited == False:
+        if self.img is None or not self.flagsInited:
             return
 
         haveDone = True
         for cidx, cnt in enumerate(self.contours):
             haveDone = self.flags[cidx] and haveDone
 
-        if haveDone == False or self.broken == True:
-            if self.resized == True and self.broken == False:
+        if not haveDone or self.broken:
+            if self.resized and not self.broken:
                 self.changeResizedImage()
                 filenum = self.filenum
                 p = multiprocessing.Process(target=saveResizedImage, args=(filenum, self.dstdir, self.dirname, self.xratio, self.yratio, self.img, self.contours, self.flags))
@@ -451,7 +421,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                 for cidx, cnt in enumerate(self.contours):
                     # If the flag for the contour is False, skip it
-                    if self.flags[cidx] == False:
+                    if not self.flags[cidx]:
                         continue
 
                     # Get the position of each contour
@@ -465,7 +435,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.filenum += 1
 
             else:
-                if self.broken == False:
+                if not self.broken:
                     self.saveImage()
                 else:
                     self.saveBrokenImage()
@@ -482,10 +452,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             p.start()
             self.loadNextPNG()
 
-
-
     def saveImage(self):
-        # Creat a directory for the segmentations of the image
+        # Create a directory for the segmentation of the image
         if self.filenum == 1:
             if os.path.exists(self.dstdir):
                 temp_path = self.dstdir+'_tmp'
@@ -502,11 +470,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         for cidx, cnt in enumerate(self.contours):
             # If the flag for the contour is False, skip it
-            if self.flags[cidx] == False:
+            if not self.flags[cidx]:
                 continue
 
             # Only the contours without parents will be saved when they are broken
-            if self.broken == True and self.hier[0][cidx][3] != -1:
+            if self.broken and self.hier[0][cidx][3] != -1:
                 continue
 
             # Get the position of each contour
@@ -516,18 +484,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             namenow = self.dirname + '_' + str(self.filenum) + self.filetype
             self.filenum += 1
 
-            # Delete the parts of other segmentations using mask
+            # Delete the parts of other segmentation using mask
             segmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-            cv2.drawContours(segmask, [cnt], 0, (255), -1)
+            cv2.drawContours(segmask, [cnt], 0, 255, -1)
 
-            if self.broken == True:
+            if self.broken:
                 now = self.hier[0][cidx][2]
-                while(now != -1):
+                while now != -1:
                     if self.hier[0][now][2] != -1:
                         segmask_tmp = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, (255), -1)
+                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, 255, -1)
                         segmask = cv2.bitwise_xor(segmask, segmask_tmp)
-                        allmask = cv2.bitwise_or(allmask, segmask)
                     now = self.hier[0][now][0]
 
             seg = cv2.bitwise_and(self.img, self.img, mask=segmask)
@@ -537,24 +504,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(self.dstdir, namenow))
 
         # Delete the element in the original image
-        allmask = cv2.dilate(allmask, np.ones((10,10), np.uint8))
+        allmask = cv2.dilate(allmask, np.ones((10, 10), np.uint8))
         allmask = cv2.bitwise_not(allmask)
         self.img = cv2.bitwise_and(self.img, self.img, mask=allmask)
 
         # Get the RGBA image from the BGRA image
         self.img_cvt = np.copy(self.img)
-        tmp = np.copy(self.img[:,:,0])
-        self.img_cvt[:,:,0] = self.img[:,:,2]
-        self.img_cvt[:,:,2] = tmp
+        tmp = np.copy(self.img[:, :, 0])
+        self.img_cvt[:, :, 0] = self.img[:, :, 2]
+        self.img_cvt[:, :, 2] = tmp
 
         # Get the binary image
-        self.achannel = self.img[:,:,-1]
+        self.achannel = self.img[:, :, -1]
         self.mask = cv2.inRange(self.achannel, 1, 255)
 
-
-
     def saveBrokenImage(self):
-        # Creat a directory for the segmentations of the image
+        # Create a directory for the segmentation of the image
         if self.filenum == 1:
             if os.path.exists(self.dstdir):
                 temp_path = self.dstdir+'_tmp'
@@ -571,7 +536,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         for cidx, cnt in enumerate(self.contours):
             # If the flag for the contour is False, skip it
-            if self.flags[cidx] == False:
+            if not self.flags[cidx]:
                 continue
 
             # Only the contours without parents will be saved when they are broken
@@ -580,7 +545,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # Get the position of each contour
             (x, y, w, h) = cv2.boundingRect(cnt)
-            if self.resized == True:
+            if self.resized:
                 x = int(x * self.xratio)
                 w = int(w * self.xratio)
                 y = int(y * self.yratio)
@@ -590,27 +555,27 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             namenow = self.dirname + '_' + str(self.filenum) + self.filetype
             self.filenum += 1
 
-            # Delete the parts of other segmentations using mask
-            if self.resized == True:
+            # Delete the parts of other segmentation using mask
+            if self.resized:
                 segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-                cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+                cv2.drawContours(segmask_resized, [cnt], 0, 255, -1)
                 segmask = cv2.resize(segmask_resized, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
                 segmask = cv2.inRange(segmask, 1, 255)
             else:
                 segmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-                cv2.drawContours(segmask, [cnt], 0, (255), -1)
+                cv2.drawContours(segmask, [cnt], 0, 255, -1)
 
             now = self.hier[0][cidx][2]
-            while(now != -1):
+            while now != -1:
                 if self.hier[0][now][2] != -1:
-                    if self.resized == True:
+                    if self.resized:
                         segmask_resized_tmp = np.zeros((2000, 2000, 1), np.uint8)
-                        cv2.drawContours(segmask_resized_tmp, [self.contours[now]], 0, (255), -1)
+                        cv2.drawContours(segmask_resized_tmp, [self.contours[now]], 0, 255, -1)
                         segmask_tmp = cv2.resize(segmask_resized_tmp, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
                         segmask_tmp = cv2.inRange(segmask_tmp, 1, 255)
                     else:
                         segmask_tmp = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, (255), -1)
+                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, 255, -1)
                     segmask = cv2.bitwise_xor(segmask, segmask_tmp)
                 now = self.hier[0][now][0]
 
@@ -627,32 +592,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Get the RGBA image from the BGRA image
         self.img_cvt = np.copy(self.img)
-        tmp = np.copy(self.img[:,:,0])
-        self.img_cvt[:,:,0] = self.img[:,:,2]
-        self.img_cvt[:,:,2] = tmp
+        tmp = np.copy(self.img[:, :, 0])
+        self.img_cvt[:, :, 0] = self.img[:, :, 2]
+        self.img_cvt[:, :, 2] = tmp
 
         # Get the binary image
-        self.achannel = self.img[:,:,-1]
+        self.achannel = self.img[:, :, -1]
         self.mask = cv2.inRange(self.achannel, 1, 255)
 
         # Judge whether or not the image should be resized
-        if self.resized == True:
+        if self.resized:
             self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
             self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
             self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-
-
 
     def changeResizedImage(self):
         allmask = np.zeros((2000, 2000, 1), np.uint8)
 
         for cidx, cnt in enumerate(self.contours):
             # If the flag for the contour is False, skip it
-            if self.flags[cidx] == False:
+            if not self.flags[cidx]:
                 continue
 
             # Only the contours without parents will be saved when they are broken
-            if self.broken == True and self.hier[0][cidx][3] != -1:
+            if self.broken and self.hier[0][cidx][3] != -1:
                 continue
 
             # Get the position of each contour
@@ -664,18 +627,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if w <= 10 or h <= 10:
                 continue
 
-            # Delete the parts of other segmentations using mask
+            # Delete the parts of other segmentation using mask
             segmask = np.zeros((2000, 2000, 1), np.uint8)
-            cv2.drawContours(segmask, [cnt], 0, (255), -1)
+            cv2.drawContours(segmask, [cnt], 0, 255, -1)
 
-            if self.broken == True:
+            if self.broken:
                 now = self.hier[0][cidx][2]
-                while(now != -1):
+                while now != -1:
                     if self.hier[0][now][2] != -1:
                         segmask_tmp = np.zeros((2000, 2000, 1), np.uint8)
-                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, (255), -1)
+                        cv2.drawContours(segmask_tmp, [self.contours[now]], 0, 255, -1)
                         segmask = cv2.bitwise_xor(segmask, segmask_tmp)
-                        allmask = cv2.bitwise_or(allmask, segmask)
                     now = self.hier[0][now][0]
 
             allmask = cv2.bitwise_or(allmask, segmask)
@@ -683,20 +645,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Delete the element in the original image
         allmask = cv2.bitwise_not(allmask)
         self.img_cvt_resized = cv2.bitwise_and(self.img_cvt_resized, self.img_cvt_resized, mask=allmask)
-        self.achannel_resized = self.img_cvt_resized[:,:,-1]
+        self.achannel_resized = self.img_cvt_resized[:, :, -1]
         self.mask_resized = cv2.inRange(self.achannel_resized, 1, 255)
-
-
 
     def breakContour(self):
         if self.img is None:
             return
 
-        if self.group == True:
+        if self.group:
             return
 
         self.broken = not self.broken
-        if self.broken == False:
+        if not self.broken:
             self.le3.setText('Normal')
         else:
             self.le3.setText('Broken')
@@ -704,22 +664,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.flagsInited = False
         self.drawPNG()
 
-
-
     def groupContour(self):
         if self.img is None:
             return
 
         self.group = not self.group
 
-        if self.group == True:
-            if self.flagsInited == True:
+        if self.group:
+            if self.flagsInited:
                 self.groupFlags = [False] * len(self.flags)
             self.broken = False
             self.ptn_group.setText(QCoreApplication.translate("MainWindow", "Finish"))
             self.drawPNG()
         else:
-            if self.flagsInited == True:
+            if self.flagsInited:
                 msg = QMessageBox()
                 msg.setStandardButtons(QMessageBox.Save | QMessageBox.Cancel)
                 ret = msg.exec_()
@@ -732,12 +690,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.flagsInited = False
                 self.drawPNG()
 
-        if self.group == False:
+        if not self.group:
             self.le3.setText('Normal')
         else:
             self.le3.setText('Group')
-
-
 
     def reloadImage(self):
         if self.imageNow <= -1 or self.imageNow >= self.imageNum:
@@ -768,30 +724,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Get the RGBA image from the BGRA image
         self.img_cvt = np.copy(self.img)
-        tmp = np.copy(self.img[:,:,0])
-        self.img_cvt[:,:,0] = self.img[:,:,2]
-        self.img_cvt[:,:,2] = tmp
+        tmp = np.copy(self.img[:, :, 0])
+        self.img_cvt[:, :, 0] = self.img[:, :, 2]
+        self.img_cvt[:, :, 2] = tmp
 
         # Get the binary image
-        self.achannel = self.img[:,:,-1]
+        self.achannel = self.img[:, :, -1]
         self.mask = cv2.inRange(self.achannel, 1, 255)
 
         # Judge whether or not the image should be resized
-        if self.resized == True:
+        if self.resized:
             self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
             self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
             self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
 
         self.drawPNG()
 
-
-
     def sliderChanged(self):
         self.flagsInited = False
         self.flags = None
         self.drawPNG()
-
-
 
     def resetParam(self):
         self.group = False
@@ -799,25 +751,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.le3.setText('Normal')
         self.vslider1.setValue(25)
 
-
-
     def mousePressEvent(self, event):
-        if self.flagsInited == False:
+        if not self.flagsInited:
             return
 
-        if self.le1.underMouse() == False:
+        if not self.le1.underMouse():
             return
 
         self.lastPoint = self.le1.mapFromParent(event.pos())
         self.clicked = True
 
-
-
     def mouseMoveEvent(self, event):
-        if self.flagsInited == False:
+        if not self.flagsInited:
             return
 
-        if self.clicked == True:
+        if self.clicked:
             posNow = self.le1.mapFromParent(event.pos())
             x = min(posNow.x(), self.lastPoint.x())
             y = min(posNow.y(), self.lastPoint.y())
@@ -827,26 +775,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             self.drawPNG()
 
-
-
     def mouseReleaseEvent(self, event):
-        if self.flagsInited == False:
+        if not self.flagsInited:
             return
 
-        if self.clicked == False:
+        if not self.clicked:
             return
 
-        if self.rec != None and self.rec[2] > 10 and self.rec[3] > 10:
+        if self.rec is not None and self.rec[2] > 10 and self.rec[3] > 10:
             for cidx, cnt in enumerate(self.contours):
                 if self.containRec(cnt):
-                    if self.group == True:
+                    if self.group:
                         self.groupFlags[cidx] = not self.groupFlags[cidx]
                     else:
                         self.flags[cidx] = not self.flags[cidx]
         else:
             for cidx, cnt in enumerate(self.contours):
                 if self.containPoint(cnt):
-                    if self.group == True:
+                    if self.group:
                         self.groupFlags[cidx] = not self.groupFlags[cidx]
                     else:
                         self.flags[cidx] = not self.flags[cidx]
@@ -854,8 +800,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.rec = None
         self.clicked = False
         self.drawPNG()
-
-
 
     # Judge whether or not the point is in the rectangle of the contour
     def containPoint(self, cnt):
@@ -865,7 +809,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return False
 
         # Calculate the position of clicked point in original image
-        if self.resized == True:
+        if self.resized:
             xnow = self.lastPoint.x() / self.le1.width() * 2000
             ynow = self.lastPoint.y() / self.le1.height() * 2000
         else:
@@ -876,15 +820,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return False
         return True
 
-
-
     # Judge whether or not the contour is in the rectangle
     def containRec(self, cnt):
         (x, y, w, h) = cv2.boundingRect(cnt)
         (recx, recy, recw, rech) = self.rec
 
         # Calculate the ratio between image and label
-        if self.resized == True:
+        if self.resized:
             xratio = 2000 / self.le1.width()
             yratio = 2000 / self.le1.height()
         else:
@@ -895,16 +837,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return False
         return True
 
-
-
     def saveGroup(self):
         flag = False
         for x in self.groupFlags:
             flag = flag or x
-        if flag == False:
+        if not flag:
             return
 
-        # Creat a directory for the segmentations of the image
+        # Create a directory for the segmentation of the image
         if self.filenum == 1:
             if os.path.exists(self.dstdir):
                 temp_path = self.dstdir+'_tmp'
@@ -928,16 +868,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         for cidx, cnt in enumerate(self.contours):
             # If the flag for the contour is False, skip it
-            if self.groupFlags[cidx] == False:
+            if not self.groupFlags[cidx]:
                 continue
 
             # Only the contours without parents will be saved when they are broken
-            if self.broken == True and self.hier[0][cidx][3] != -1:
+            if self.broken and self.hier[0][cidx][3] != -1:
                 continue
 
             # Get the position of each contour
             (x, y, w, h) = cv2.boundingRect(cnt)
-            if self.resized == True:
+            if self.resized:
                 x = int(x * self.xratio)
                 w = int(w * self.xratio)
                 y = int(y * self.yratio)
@@ -950,15 +890,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             xmax = max(x+w, xmax)
             ymax = max(y+h, ymax)
 
-            # Delete the parts of other segmentations using mask
-            if self.resized == True:
+            # Delete the parts of other segmentation using mask
+            if self.resized:
                 segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
-                cv2.drawContours(segmask_resized, [cnt], 0, (255), -1)
+                cv2.drawContours(segmask_resized, [cnt], 0, 255, -1)
                 segmask = cv2.resize(segmask_resized, (self.img.shape[1], self.img.shape[0]), interpolation=cv2.INTER_LINEAR)
                 segmask = cv2.inRange(segmask, 1, 255)
             else:
                 segmask = np.zeros((self.img.shape[0], self.img.shape[1], 1), np.uint8)
-                cv2.drawContours(segmask, [cnt], 0, (255), -1)
+                cv2.drawContours(segmask, [cnt], 0, 255, -1)
 
             allmask = cv2.bitwise_or(allmask, segmask)
 
@@ -967,26 +907,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         cv2.imencode('.png', seg[ymin:ymax, xmin:xmax])[1].tofile(os.path.join(self.dstdir, namenow))
 
         # Delete the element in the original image
-        allmask = cv2.dilate(allmask, np.ones((10,10), np.uint8))
+        allmask = cv2.dilate(allmask, np.ones((10, 10), np.uint8))
         allmask = cv2.bitwise_not(allmask)
         self.img = cv2.bitwise_and(self.img, self.img, mask=allmask)
 
         # Get the RGBA image from the BGRA image
         self.img_cvt = np.copy(self.img)
         tmp = np.copy(self.img[:,:,0])
-        self.img_cvt[:,:,0] = self.img[:,:,2]
-        self.img_cvt[:,:,2] = tmp
+        self.img_cvt[:, :, 0] = self.img[:, :, 2]
+        self.img_cvt[:, :, 2] = tmp
 
         # Get the binary image
-        self.achannel = self.img[:,:,-1]
+        self.achannel = self.img[:, :, -1]
         self.mask = cv2.inRange(self.achannel, 1, 255)
 
         # Judge whether or not the image should be resized
-        if self.resized == True:
+        if self.resized:
             self.img_cvt_resized = cv2.resize(self.img_cvt, (2000, 2000), interpolation=cv2.INTER_NEAREST)
             self.achannel_resized = cv2.resize(self.achannel, (2000, 2000), interpolation=cv2.INTER_NEAREST)
             self.mask_resized = cv2.resize(self.mask, (2000, 2000), interpolation=cv2.INTER_NEAREST)
-
 
 
 if __name__ == "__main__":

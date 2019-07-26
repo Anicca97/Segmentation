@@ -226,7 +226,7 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
     if img is None:
         return
 
-    # Creat a directory for the segmentation of the image
+    # Create a directory for the segmentation of the image
     if filenum == 1:
         if os.path.exists(dstdir):
             temp_path = dstdir+'_tmp'
@@ -337,7 +337,7 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
         xmax = max(x+w, xmax)
         ymax = max(y+h, ymax)
 
-        # Delete the parts of other segmentations using mask
+        # Delete the parts of other segmentation using mask
         segmask_resized = np.zeros((2000, 2000, 1), np.uint8)
         cv2.drawContours(segmask_resized, [cnt], 0, 255, -1)
         segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
@@ -370,7 +370,7 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
     if img is None or svg is None:
         return
 
-    # Creat a directory for the segmentations of the image
+    # Create a directory for the segmentation of the image
     if filenum == 1:
         if os.path.exists(dstdir):
             temp_path = dstdir+'_tmp'
@@ -425,7 +425,7 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
                 segpath.append(path)
                 attributes.append(svg[1][i])
 
-        # Delete the parts of other segmentations using mask
+        # Delete the parts of other segmentation using mask
         now = hier[0][cidx][2]
         while now != -1:
             if hier[0][now][2] != -1:
@@ -485,7 +485,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def setupAction(self):
         # Set the menus
         self.action_Open.triggered.connect(self.showFileDialog)
-        self.action_OpenFile.triggered.connect(self.readFile)
+        self.action_OpenFolder.triggered.connect(self.readFolder)
         self.action_Save.triggered.connect(self.saveFile)
         self.action_Break.triggered.connect(self.breakContour)
         self.action_Quit.triggered.connect(self.close)
@@ -506,7 +506,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.ptn_last.clicked.connect(self.loadLastPNG)
         self.ptn_next.clicked.connect(self.loadNextPNG)
         self.ptn_reverse.clicked.connect(self.reverseFlags)
-        self.ptn_openfile.clicked.connect(self.readFile)
+        self.ptn_openfolder.clicked.connect(self.readFolder)
 
         # Set the labels
         self.le3.setText('Normal')
@@ -527,7 +527,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # Load image
             self.loadNextPNG()
 
-    def readFile(self):
+    def readFolder(self):
         # Get images' path and name
         options = QFileDialog.Options() | QFileDialog.DontUseNativeDialog | QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
         fdir = QFileDialog.getExistingDirectory(self, 'Open file', '', options=options)
@@ -747,7 +747,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 continue
             self.filenum += 1
 
-            # Delete the parts of other segmentations using mask
+            # Delete the parts of other segmentation using mask
             segmask = np.zeros((2000, 2000, 1), np.uint8)
             cv2.drawContours(segmask, [cnt], 0, 255, -1)
 

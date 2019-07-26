@@ -122,9 +122,9 @@
            </widget>
           </item>
           <item row="2" column="2">
-           <widget class="QPushButton" name="ptn_openfile">
+           <widget class="QPushButton" name="ptn_openfolder">
             <property name="text">
-             <string>&amp;Open File</string>
+             <string>&amp;Open Folder</string>
             </property>
            </widget>
           </item>
@@ -206,7 +206,7 @@
      <string>&amp;File</string>
     </property>
     <addaction name="action_Open"/>
-    <addaction name="action_OpenFile"/>
+    <addaction name="action_OpenFolder"/>
     <addaction name="action_Reload"/>
     <addaction name="separator"/>
     <addaction name="action_Save"/>
@@ -230,9 +230,9 @@
    <addaction name="menu_Edit"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <action name="action_OpenFile">
+  <action name="action_OpenFolder">
    <property name="text">
-    <string>&amp;Open File</string>
+    <string>&amp;Open Folder</string>
    </property>
    <property name="statusTip">
     <string>Open an image from the file system</string>
