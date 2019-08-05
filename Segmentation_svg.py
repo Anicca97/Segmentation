@@ -32,6 +32,10 @@ COORD_PAIR_TMPLT = re.compile(
 )
 
 
+POINT_NUM = 100
+DISTANCE = -10
+
+
 def path2pathd(path):
     return path.get('d', '')
 
@@ -237,7 +241,7 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
                     raise
             else:
                 rmtree(temp_path)
-        os.mkdir(dstdir)
+        os.makedirs(dstdir)
 
     for cidx, cnt in enumerate(contours):
         # If the flag for the contour is False, skip it
@@ -265,17 +269,17 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
         seg = cv2.bitwise_and(img, img, mask=segmask)
 
         # Write the element into file system
-        cv2.imwrite(os.path.join(dstdir, namenow), seg[y:y+h, x:x+w])
+        cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(dstdir, namenow))
 
         if svg is not None:
             g = parseString(svg[1])
             pathnodes, paths = find_paths(g)
             segpath = list()
             for i, path in enumerate(paths):
-                for j in range(100):
-                    px = path.point((j+1)/100-0.01).real * t / xratio
-                    py = path.point((j+1)/100-0.01).imag * t / yratio
-                    if cv2.pointPolygonTest(cnt, (px, py), False) >= 0:
+                for j in range(POINT_NUM):
+                    px = path.point(j / POINT_NUM).real * t / xratio
+                    py = path.point(j / POINT_NUM).imag * t / yratio
+                    if cv2.pointPolygonTest(cnt, (px, py), True) >= DISTANCE:
                         segpath.append(find_parent(pathnodes[i]))
                         break
             svg_attributes = svg[2]
@@ -295,7 +299,7 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
     # Create a directory for the segmentation of the image
     if filenum == 1:
         if os.path.exists(dstdir):
-            temp_path = dstdir+'_tmp'
+            temp_path = dstdir + '_tmp'
             try:
                 os.renames(dstdir, temp_path)
             except OSError as e:
@@ -303,7 +307,7 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
                     raise
             else:
                 rmtree(temp_path)
-        os.mkdir(dstdir)
+        os.makedirs(dstdir)
 
     namenow = dirname + '_' + str(filenum) + '.png'
     svgnow = dirname + '_' + str(filenum) + '.svg'
@@ -358,7 +362,7 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
 
     # Write the element into file system
     seg = cv2.bitwise_and(img, img, mask=allmask)
-    cv2.imwrite(os.path.join(dstdir, namenow), seg[ymin:ymax, xmin:xmax])
+    cv2.imencode('.png', seg[ymin:ymax, xmin:xmax])[1].tofile(os.path.join(dstdir, namenow))
 
     svg_attributes = svg[2]
     svg_attributes['viewBox'] = '{} {} {} {}'.format(xmin/t, ymin/t, (xmax-xmin)/t, (ymax-ymin)/t)
@@ -373,7 +377,7 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
     # Create a directory for the segmentation of the image
     if filenum == 1:
         if os.path.exists(dstdir):
-            temp_path = dstdir+'_tmp'
+            temp_path = dstdir + '_tmp'
             try:
                 os.renames(dstdir, temp_path)
             except OSError as e:
@@ -381,7 +385,7 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
                     raise
             else:
                 rmtree(temp_path)
-        os.mkdir(dstdir)
+        os.makedirs(dstdir)
 
     for cidx, cnt in enumerate(contours):
         # If the flag for the contour is False, skip it
@@ -452,7 +456,7 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
         seg = cv2.bitwise_and(img, img, mask=segmask)
 
         # Write the element into file system
-        cv2.imwrite(os.path.join(dstdir, namenow), seg[y:y+h, x:x+w])
+        cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(dstdir, namenow))
 
         if len(segpath) > 0:
             wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
@@ -490,7 +494,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.action_Break.triggered.connect(self.breakContour)
         self.action_Quit.triggered.connect(self.close)
         self.action_Reload.triggered.connect(self.loadPNG)
-        self.action_Last.triggered.connect(self.loadLastPNG)
+        self.action_Previous.triggered.connect(self.loadPrevious)
         self.action_Next.triggered.connect(self.loadNextPNG)
         self.action_Up.triggered.connect(self.upKernel)
         self.action_Down.triggered.connect(self.downKernel)
@@ -503,7 +507,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.ptn_break.clicked.connect(self.breakContour)
         self.ptn_group.clicked.connect(self.groupContour)
         self.ptn_reload.clicked.connect(self.loadPNG)
-        self.ptn_last.clicked.connect(self.loadLastPNG)
+        self.ptn_previous.clicked.connect(self.loadPreviousPNG)
         self.ptn_next.clicked.connect(self.loadNextPNG)
         self.ptn_reverse.clicked.connect(self.reverseFlags)
         self.ptn_openfolder.clicked.connect(self.readFolder)
@@ -545,7 +549,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 # Load image
                 self.loadNextPNG()
 
-    def loadLastPNG(self):
+    def loadPreviousPNG(self):
         if self.imageNow > -1:
             self.imageNow -= 1
             self.loadPNG()
@@ -571,12 +575,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if not self.flagsInited:
             return
 
-        if self.group:
-            for i, flag in enumerate(self.flags):
-                self.flags[i] = not flag
-        else:
-            for i, flag in enumerate(self.flags):
-                self.flags[i] = not flag
+        for i, flag in enumerate(self.flags):
+            self.flags[i] = not flag
+
         self.drawPNG()
 
     def loadPNG(self):
@@ -593,7 +594,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         if self.fnames[self.imageNow] != '':
-            self.img = cv2.imread(self.fnames[self.imageNow], cv2.IMREAD_UNCHANGED)
+            self.img = cv2.imdecode(np.fromfile(self.fnames[self.imageNow], dtype=np.uint8), cv2.IMREAD_UNCHANGED)
             if self.img is None:
                 return
 
@@ -763,6 +764,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             allmask = cv2.bitwise_or(allmask, segmask)
 
         # Delete the element in the original image
+        allmask = cv2.dilate(allmask, np.ones((10, 10), np.uint8))
         allmask = cv2.bitwise_not(allmask)
         self.img_cvt_resized = cv2.bitwise_and(self.img_cvt_resized, self.img_cvt_resized, mask=allmask)
         self.achannel_resized = self.img_cvt_resized[:, :, -1]

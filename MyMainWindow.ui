@@ -35,7 +35,7 @@
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="vbox1" stretch="0,0,0,0,0,0">
+       <layout class="QVBoxLayout" name="vbox1" stretch="0,0,0,0,0">
         <item>
          <layout class="QVBoxLayout" name="vbox2" stretch="1,9">
           <property name="spacing">
@@ -143,9 +143,9 @@
            </widget>
           </item>
           <item row="3" column="0">
-           <widget class="QPushButton" name="ptn_last">
+           <widget class="QPushButton" name="ptn_previous">
             <property name="text">
-             <string>&amp;Last</string>
+             <string>&amp;Previous</string>
             </property>
            </widget>
           </item>
@@ -177,14 +177,21 @@
             </property>
            </widget>
           </item>
+          <item row="8" column="0">
+           <widget class="QPushButton" name="ptn_loadconfig">
+            <property name="text">
+             <string>&amp;Load Config</string>
+            </property>
+           </widget>
+          </item>
+          <item row="8" column="2">
+           <widget class="QPushButton" name="ptn_quit">
+            <property name="text">
+             <string>&amp;Quit</string>
+            </property>
+           </widget>
+          </item>
          </layout>
-        </item>
-        <item>
-         <widget class="QPushButton" name="ptn_quit">
-          <property name="text">
-           <string>&amp;Quit</string>
-          </property>
-         </widget>
         </item>
        </layout>
       </item>
@@ -212,12 +219,14 @@
     <addaction name="action_Save"/>
     <addaction name="separator"/>
     <addaction name="action_Quit"/>
+    <addaction name="separator"/>
+    <addaction name="action_LoadConfig"/>
    </widget>
    <widget class="QMenu" name="menu_Edit">
     <property name="title">
      <string>&amp;Edit</string>
     </property>
-    <addaction name="action_Last"/>
+    <addaction name="action_Previous"/>
     <addaction name="action_Next"/>
     <addaction name="separator"/>
     <addaction name="action_Group"/>
@@ -296,15 +305,15 @@
     <string>N</string>
    </property>
   </action>
-  <action name="action_Last">
+  <action name="action_Previous">
    <property name="text">
-    <string>&amp;Last</string>
+    <string>&amp;Previous</string>
    </property>
    <property name="statusTip">
     <string>Load last image</string>
    </property>
    <property name="shortcut">
-    <string>L</string>
+    <string>P</string>
    </property>
   </action>
   <action name="action_Group">
@@ -340,6 +349,14 @@
    </property>
    <property name="shortcut">
     <string>Down</string>
+   </property>
+  </action>
+  <action name="action_LoadConfig">
+   <property name="text">
+    <string>&amp;Load Config</string>
+   </property>
+   <property name="shortcut">
+    <string>L</string>
    </property>
   </action>
  </widget>

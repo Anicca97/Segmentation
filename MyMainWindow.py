@@ -8,12 +8,14 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+
 class Slider(QtWidgets.QSlider):
     def mousePressEvent(self, e):
         self.setValue(QtWidgets.QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), self.height() - e.y(), self.height()))
 
     def mouseMoveEvent(self, e):
         self.setValue(QtWidgets.QStyle.sliderValueFromPosition(self.minimum(), self.maximum(), self.height() - e.y(), self.height()))
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -94,9 +96,9 @@ class Ui_MainWindow(object):
         self.ptn_next = QtWidgets.QPushButton(self.centralwidget)
         self.ptn_next.setObjectName("ptn_next")
         self.gbox1.addWidget(self.ptn_next, 3, 2, 1, 1)
-        self.ptn_last = QtWidgets.QPushButton(self.centralwidget)
-        self.ptn_last.setObjectName("ptn_last")
-        self.gbox1.addWidget(self.ptn_last, 3, 0, 1, 1)
+        self.ptn_previous = QtWidgets.QPushButton(self.centralwidget)
+        self.ptn_previous.setObjectName("ptn_previous")
+        self.gbox1.addWidget(self.ptn_previous, 3, 0, 1, 1)
         self.ptn_break = QtWidgets.QPushButton(self.centralwidget)
         self.ptn_break.setObjectName("ptn_break")
         self.gbox1.addWidget(self.ptn_break, 5, 0, 1, 1)
@@ -109,10 +111,13 @@ class Ui_MainWindow(object):
         self.ptn_save = QtWidgets.QPushButton(self.centralwidget)
         self.ptn_save.setObjectName("ptn_save")
         self.gbox1.addWidget(self.ptn_save, 7, 0, 1, 1)
-        self.vbox1.addLayout(self.gbox1)
+        self.ptn_loadconfig = QtWidgets.QPushButton(self.centralwidget)
+        self.ptn_loadconfig.setObjectName("ptn_loadconfig")
+        self.gbox1.addWidget(self.ptn_loadconfig, 8, 0, 1, 1)
         self.ptn_quit = QtWidgets.QPushButton(self.centralwidget)
         self.ptn_quit.setObjectName("ptn_quit")
-        self.vbox1.addWidget(self.ptn_quit)
+        self.gbox1.addWidget(self.ptn_quit, 8, 2, 1, 1)
+        self.vbox1.addLayout(self.gbox1)
         self.hbox1.addLayout(self.vbox1)
         self.hbox1.setStretch(0, 4)
         self.hbox1.setStretch(2, 1)
@@ -141,8 +146,8 @@ class Ui_MainWindow(object):
         self.action_Break.setObjectName("action_Break")
         self.action_Next = QtWidgets.QAction(MainWindow)
         self.action_Next.setObjectName("action_Next")
-        self.action_Last = QtWidgets.QAction(MainWindow)
-        self.action_Last.setObjectName("action_Last")
+        self.action_Previous = QtWidgets.QAction(MainWindow)
+        self.action_Previous.setObjectName("action_Previous")
         self.action_Group = QtWidgets.QAction(MainWindow)
         self.action_Group.setObjectName("action_Group")
         self.action_Open = QtWidgets.QAction(MainWindow)
@@ -151,6 +156,8 @@ class Ui_MainWindow(object):
         self.action_Up.setObjectName("action_Up")
         self.action_Down = QtWidgets.QAction(MainWindow)
         self.action_Down.setObjectName("action_Down")
+        self.action_LoadConfig = QtWidgets.QAction(MainWindow)
+        self.action_LoadConfig.setObjectName("action_LoadConfig")
         self.menu_File.addAction(self.action_Open)
         self.menu_File.addAction(self.action_OpenFolder)
         self.menu_File.addAction(self.action_Reload)
@@ -158,7 +165,9 @@ class Ui_MainWindow(object):
         self.menu_File.addAction(self.action_Save)
         self.menu_File.addSeparator()
         self.menu_File.addAction(self.action_Quit)
-        self.menu_Edit.addAction(self.action_Last)
+        self.menu_File.addSeparator()
+        self.menu_File.addAction(self.action_LoadConfig)
+        self.menu_Edit.addAction(self.action_Previous)
         self.menu_Edit.addAction(self.action_Next)
         self.menu_Edit.addSeparator()
         self.menu_Edit.addAction(self.action_Group)
@@ -183,11 +192,12 @@ class Ui_MainWindow(object):
         self.ptn_openfolder.setText(_translate("MainWindow", "&Open Folder"))
         self.ptn_open.setText(_translate("MainWindow", "Open"))
         self.ptn_next.setText(_translate("MainWindow", "&Next"))
-        self.ptn_last.setText(_translate("MainWindow", "&Last"))
+        self.ptn_previous.setText(_translate("MainWindow", "&Previous"))
         self.ptn_break.setText(_translate("MainWindow", "&Break"))
         self.ptn_group.setText(_translate("MainWindow", "&Group"))
         self.ptn_reverse.setText(_translate("MainWindow", "Reverse"))
         self.ptn_save.setText(_translate("MainWindow", "&Save"))
+        self.ptn_loadconfig.setText(_translate("MainWindow", "&Load Config"))
         self.ptn_quit.setText(_translate("MainWindow", "&Quit"))
         self.menu_File.setTitle(_translate("MainWindow", "&File"))
         self.menu_Edit.setTitle(_translate("MainWindow", "&Edit"))
@@ -209,9 +219,9 @@ class Ui_MainWindow(object):
         self.action_Next.setText(_translate("MainWindow", "&Next"))
         self.action_Next.setStatusTip(_translate("MainWindow", "Load next image"))
         self.action_Next.setShortcut(_translate("MainWindow", "N"))
-        self.action_Last.setText(_translate("MainWindow", "&Last"))
-        self.action_Last.setStatusTip(_translate("MainWindow", "Load last image"))
-        self.action_Last.setShortcut(_translate("MainWindow", "L"))
+        self.action_Previous.setText(_translate("MainWindow", "&Previous"))
+        self.action_Previous.setStatusTip(_translate("MainWindow", "Load last image"))
+        self.action_Previous.setShortcut(_translate("MainWindow", "P"))
         self.action_Group.setText(_translate("MainWindow", "Group"))
         self.action_Group.setStatusTip(_translate("MainWindow", "Group the contours"))
         self.action_Group.setShortcut(_translate("MainWindow", "G"))
@@ -221,4 +231,6 @@ class Ui_MainWindow(object):
         self.action_Up.setShortcut(_translate("MainWindow", "Up"))
         self.action_Down.setText(_translate("MainWindow", "Down"))
         self.action_Down.setShortcut(_translate("MainWindow", "Down"))
+        self.action_LoadConfig.setText(_translate("MainWindow", "&Load Config"))
+        self.action_LoadConfig.setShortcut(_translate("MainWindow", "L"))
 
