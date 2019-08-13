@@ -199,6 +199,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.action_Up.triggered.connect(self.upKernel)
         self.action_Down.triggered.connect(self.downKernel)
         self.action_LoadConfig.triggered.connect(self.loadConfig)
+        self.action_LoadFolder.triggered.connect(self.loadFolder)
 
         # Set the bottons
         self.ptn_save.clicked.connect(self.saveConfig)
@@ -213,6 +214,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.ptn_reverse.clicked.connect(self.reverseFlags)
         self.ptn_openfolder.clicked.connect(self.readFolder)
         self.ptn_loadconfig.clicked.connect(self.loadConfig)
+        self.ptn_loadfolder.clicked.connect(self.loadFolder)
 
         # Set the labels
         self.le3.setText('Normal')
@@ -633,6 +635,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.loadNextPNG()
 
     def loadConfig(self):
+        # Get images' path and name
+        options = QFileDialog.Options() | QFileDialog.DontUseNativeDialog
+        fnames, _ = QFileDialog.getOpenFileNames(self, 'Open file', '', 'Image files (*.png)', options=options)
+        if fnames != []:
+            self.fnames = fnames
+            self.configNum = len(self.fnames)
+            self.configNow = -1
+
+            # Load image
+            self.le3.setText('0/{}'.format(self.configNum))
+            self.dealNextPNG()
+
+    def loadFolder(self):
         # Get images' path and name
         options = QFileDialog.Options() | QFileDialog.DontUseNativeDialog | QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
         fdir = QFileDialog.getExistingDirectory(self, 'Open file', '', options=options)

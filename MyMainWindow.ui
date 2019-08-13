@@ -35,7 +35,7 @@
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="vbox1" stretch="0,0,0,0,0">
+       <layout class="QVBoxLayout" name="vbox1" stretch="0,0,0,0,0,0">
         <item>
          <layout class="QVBoxLayout" name="vbox2" stretch="1,9">
           <property name="spacing">
@@ -180,18 +180,25 @@
           <item row="8" column="0">
            <widget class="QPushButton" name="ptn_loadconfig">
             <property name="text">
-             <string>&amp;Load Config</string>
+             <string>Load Config</string>
             </property>
            </widget>
           </item>
           <item row="8" column="2">
-           <widget class="QPushButton" name="ptn_quit">
+           <widget class="QPushButton" name="ptn_loadfolder">
             <property name="text">
-             <string>&amp;Quit</string>
+             <string>&amp;Load Folder</string>
             </property>
            </widget>
           </item>
          </layout>
+        </item>
+        <item>
+         <widget class="QPushButton" name="ptn_quit">
+          <property name="text">
+           <string>&amp;Quit</string>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>
@@ -221,6 +228,7 @@
     <addaction name="action_Quit"/>
     <addaction name="separator"/>
     <addaction name="action_LoadConfig"/>
+    <addaction name="action_LoadFolder"/>
    </widget>
    <widget class="QMenu" name="menu_Edit">
     <property name="title">
@@ -318,7 +326,7 @@
   </action>
   <action name="action_Group">
    <property name="text">
-    <string>Group</string>
+    <string>&amp;Group</string>
    </property>
    <property name="statusTip">
     <string>Group the contours</string>
@@ -353,7 +361,12 @@
   </action>
   <action name="action_LoadConfig">
    <property name="text">
-    <string>&amp;Load Config</string>
+    <string>Load Config</string>
+   </property>
+  </action>
+  <action name="action_LoadFolder">
+   <property name="text">
+    <string>&amp;Load Folder</string>
    </property>
    <property name="shortcut">
     <string>L</string>
