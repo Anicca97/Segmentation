@@ -227,7 +227,7 @@ def find_parent(element):
 
 def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, flags):
     # If there is no image loaded, return
-    if img is None:
+    if img is None or svg is None:
         return
 
     # Create a directory for the segmentation of the image
@@ -242,6 +242,11 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
             else:
                 rmtree(temp_path)
         os.makedirs(dstdir)
+
+    noimagetag = svg[0].find('<image') < 0
+    if noimagetag:
+        g = parseString(svg[1])
+        pathnodes, paths = find_paths(g)
 
     for cidx, cnt in enumerate(contours):
         # If the flag for the contour is False, skip it
@@ -271,25 +276,50 @@ def saveImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, f
         # Write the element into file system
         cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(dstdir, namenow))
 
-        if svg is not None:
-            g = parseString(svg[1])
-            pathnodes, paths = find_paths(g)
+        if noimagetag:
             segpath = list()
-            for i, path in enumerate(paths):
-                for j in range(POINT_NUM):
-                    px = path.point(j / POINT_NUM).real * t / xratio
-                    py = path.point(j / POINT_NUM).imag * t / yratio
+            if svg[0] == '':
+                for i, path in enumerate(paths):
+                    p1x = path.point(0).real * t / xratio
+                    p1y = path.point(0).imag * t / yratio
+                    p2x = path.point(1).real * t / xratio
+                    p2y = path.point(1).imag * t / yratio
+                    incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
+                    incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
+                    if incnt1 >= 0 or incnt2 >= 0:
+                        segpath.append(pathnodes[i])
+            else:
+                for i, path in enumerate(paths):
+                    p1x = path.point(0).real * t / xratio
+                    p1y = path.point(0).imag * t / yratio
+                    p2x = path.point(1).real * t / xratio
+                    p2y = path.point(1).imag * t / yratio
+                    incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
+                    incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
+                    if incnt1 >= 0 or incnt2 >= 0:
+                        segpath.append(find_parent(pathnodes[i]))
+                        continue
+                    px = py = 0
+                    for j in range(POINT_NUM+1):
+                        px += path.point(j/POINT_NUM).real
+                        py += path.point(j/POINT_NUM).imag
+                    px = px / (POINT_NUM+1) * t / xratio
+                    py = py / (POINT_NUM+1) * t / yratio
                     if cv2.pointPolygonTest(cnt, (px, py), True) >= DISTANCE:
                         segpath.append(find_parent(pathnodes[i]))
-                        break
             svg_attributes = svg[2]
             svg_attributes['viewBox'] = '{} {} {} {}'.format(x/t, y/t, w/t, h/t)
             if len(segpath) > 0:
                 write_svg(os.path.join(dstdir, svgnow), svg[0], segpath, svg_attributes)
-            g.unlink()
+                os.system("svgo --pretty {}".format(os.path.join(dstdir, svgnow)))
+    if noimagetag:
+        g.unlink()
 
 
 def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, flags):
+    if img is None or svg is None:
+        return
+
     flag = False
     for x in flags:
         flag = flag or x
@@ -309,6 +339,8 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
                 rmtree(temp_path)
         os.makedirs(dstdir)
 
+    noimagetag = svg[0].find('<image') < 0
+
     namenow = dirname + '_' + str(filenum) + '.png'
     svgnow = dirname + '_' + str(filenum) + '.svg'
     filenum += 1
@@ -319,8 +351,10 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
     xmax = -1
     ymax = -1
 
-    segpath = list()
-    attributes = list()
+    if noimagetag:
+        g = parseString(svg[1])
+        pathnodes, paths = find_paths(g)
+        segpath = list()
 
     for cidx, cnt in enumerate(contours):
         # If the flag for the contour is False, skip it
@@ -349,25 +383,48 @@ def saveGroupImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contou
 
         allmask = cv2.bitwise_or(allmask, segmask)
 
-        for i, path in enumerate(svg[0]):
-            p1x = path.point(0).real * t / xratio
-            p1y = path.point(0).imag * t / yratio
-            p2x = path.point(1).real * t / xratio
-            p2y = path.point(1).imag * t / yratio
-            incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
-            incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
-            if incnt1 >= 0 or incnt2 >= 0:
-                segpath.append(path)
-                attributes.append(svg[1][i])
+        if noimagetag:
+            if svg[0] == '':
+                for i, path in enumerate(paths):
+                    p1x = path.point(0).real * t / xratio
+                    p1y = path.point(0).imag * t / yratio
+                    p2x = path.point(1).real * t / xratio
+                    p2y = path.point(1).imag * t / yratio
+                    incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
+                    incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
+                    if incnt1 >= 0 or incnt2 >= 0:
+                        segpath.append(pathnodes[i])
+            else:
+                for i, path in enumerate(paths):
+                    p1x = path.point(0).real * t / xratio
+                    p1y = path.point(0).imag * t / yratio
+                    p2x = path.point(1).real * t / xratio
+                    p2y = path.point(1).imag * t / yratio
+                    incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
+                    incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
+                    if incnt1 >= 0 or incnt2 >= 0:
+                        segpath.append(find_parent(pathnodes[i]))
+                        continue
+                    px = py = 0
+                    for j in range(POINT_NUM + 1):
+                        px += path.point(j / POINT_NUM).real
+                        py += path.point(j / POINT_NUM).imag
+                    px = px / (POINT_NUM + 1) * t / xratio
+                    py = py / (POINT_NUM + 1) * t / yratio
+                    if cv2.pointPolygonTest(cnt, (px, py), True) >= DISTANCE:
+                        segpath.append(find_parent(pathnodes[i]))
 
     # Write the element into file system
     seg = cv2.bitwise_and(img, img, mask=allmask)
     cv2.imencode('.png', seg[ymin:ymax, xmin:xmax])[1].tofile(os.path.join(dstdir, namenow))
 
-    svg_attributes = svg[2]
-    svg_attributes['viewBox'] = '{} {} {} {}'.format(xmin/t, ymin/t, (xmax-xmin)/t, (ymax-ymin)/t)
-    if len(segpath) > 0:
-        wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
+    if noimagetag:
+        svg_attributes = svg[2]
+        svg_attributes['viewBox'] = '{} {} {} {}'.format(xmin/t, ymin/t, (xmax-xmin)/t, (ymax-ymin)/t)
+        if len(segpath) > 0:
+            write_svg(os.path.join(dstdir, svgnow), svg[0], segpath, svg_attributes)
+            os.system("svgo --pretty {}".format(os.path.join(dstdir, svgnow)))
+        g.unlink()
 
 
 def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, contours, flags, hier):
@@ -386,6 +443,11 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
             else:
                 rmtree(temp_path)
         os.makedirs(dstdir)
+
+    noimagetag = svg[0].find('<image') < 0
+    if noimagetag:
+        g = parseString(svg[1])
+        pathnodes, paths = find_paths(g)
 
     for cidx, cnt in enumerate(contours):
         # If the flag for the contour is False, skip it
@@ -413,21 +475,39 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
         segmask = cv2.resize(segmask_resized, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
         segmask = cv2.inRange(segmask, 1, 255)
 
-        segpath = list()
-        attributes = list()
-        svg_attributes = svg[2]
-        svg_attributes['viewBox'] = '{} {} {} {}'.format(x/t, y/t, w/t, h/t)
-
-        for i, path in enumerate(svg[0]):
-            p1x = path.point(0).real * t / xratio
-            p1y = path.point(0).imag * t / yratio
-            p2x = path.point(1).real * t / xratio
-            p2y = path.point(1).imag * t / yratio
-            incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
-            incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
-            if incnt1 >= 0 or incnt2 >= 0:
-                segpath.append(path)
-                attributes.append(svg[1][i])
+        if noimagetag:
+            segpath = list()
+            svg_attributes = svg[2]
+            svg_attributes['viewBox'] = '{} {} {} {}'.format(x/t, y/t, w/t, h/t)
+            if svg[0] == '':
+                for i, path in enumerate(paths):
+                    p1x = path.point(0).real * t / xratio
+                    p1y = path.point(0).imag * t / yratio
+                    p2x = path.point(1).real * t / xratio
+                    p2y = path.point(1).imag * t / yratio
+                    incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
+                    incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
+                    if incnt1 >= 0 or incnt2 >= 0:
+                        segpath.append(pathnodes[i])
+            else:
+                for i, path in enumerate(paths):
+                    p1x = path.point(0).real * t / xratio
+                    p1y = path.point(0).imag * t / yratio
+                    p2x = path.point(1).real * t / xratio
+                    p2y = path.point(1).imag * t / yratio
+                    incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
+                    incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
+                    if incnt1 >= 0 or incnt2 >= 0:
+                        segpath.append(find_parent(pathnodes[i]))
+                        continue
+                    px = py = 0
+                    for j in range(POINT_NUM+1):
+                        px += path.point(j/POINT_NUM).real
+                        py += path.point(j/POINT_NUM).imag
+                    px = px / (POINT_NUM+1) * t / xratio
+                    py = py / (POINT_NUM+1) * t / yratio
+                    if cv2.pointPolygonTest(cnt, (px, py), True) >= DISTANCE:
+                        segpath.append(find_parent(pathnodes[i]))
 
         # Delete the parts of other segmentation using mask
         now = hier[0][cidx][2]
@@ -438,19 +518,41 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
                 segmask_tmp = cv2.resize(segmask_resized_tmp, (img.shape[1], img.shape[0]), interpolation=cv2.INTER_LINEAR)
                 segmask_tmp = cv2.inRange(segmask_tmp, 1, 255)
                 segmask = cv2.bitwise_xor(segmask, segmask_tmp)
-                dellist = list()
-                for i, path in enumerate(segpath):
-                    p1x = path.point(0).real * t / xratio
-                    p1y = path.point(0).imag * t / yratio
-                    p2x = path.point(1).real * t / xratio
-                    p2y = path.point(1).imag * t / yratio
-                    incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
-                    incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
-                    if incnt1 >= 0 or incnt2 >= 0:
-                        dellist.append(i)
-                for delnum in reversed(dellist):
-                    segpath.pop(delnum)
-                    attributes.pop(delnum)
+                if noimagetag:
+                    dellist = list()
+                    if svg[0] == '':
+                        for i, path in enumerate(paths):
+                            p1x = path.point(0).real * t / xratio
+                            p1y = path.point(0).imag * t / yratio
+                            p2x = path.point(1).real * t / xratio
+                            p2y = path.point(1).imag * t / yratio
+                            incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
+                            incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
+                            if incnt1 >= 0 or incnt2 >= 0:
+                                segpath.append(pathnodes[i])
+                    else:
+                        for i, path in enumerate(paths):
+                            p1x = path.point(0).real * t / xratio
+                            p1y = path.point(0).imag * t / yratio
+                            p2x = path.point(1).real * t / xratio
+                            p2y = path.point(1).imag * t / yratio
+                            incnt1 = cv2.pointPolygonTest(cnt, (p1x, p1y), False)
+                            incnt2 = cv2.pointPolygonTest(cnt, (p2x, p2y), False)
+                            if incnt1 >= 0 or incnt2 >= 0:
+                                dellist.append(i)
+                                continue
+                            px = py = 0
+                            for j in range(POINT_NUM + 1):
+                                px += path.point(j / POINT_NUM).real
+                                py += path.point(j / POINT_NUM).imag
+                            px = px / (POINT_NUM + 1) * t / xratio
+                            py = py / (POINT_NUM + 1) * t / yratio
+                            if cv2.pointPolygonTest(cnt, (px, py), True) >= DISTANCE:
+                                dellist.append(i)
+
+                    for delnum in reversed(dellist):
+                        segpath.pop(delnum)
+
             now = hier[0][now][0]
 
         seg = cv2.bitwise_and(img, img, mask=segmask)
@@ -458,8 +560,13 @@ def saveBrokenImage(filenum, dstdir, dirname, xratio, yratio, img, svg, t, conto
         # Write the element into file system
         cv2.imencode('.png', seg[y:y+h, x:x+w])[1].tofile(os.path.join(dstdir, namenow))
 
-        if len(segpath) > 0:
-            wsvg(segpath, attributes=attributes, svg_attributes=svg_attributes, filename=os.path.join(dstdir, svgnow))
+        if noimagetag:
+            if len(segpath) > 0:
+                write_svg(os.path.join(dstdir, svgnow), svg[0], segpath, svg_attributes)
+                os.system("svgo --pretty {}".format(os.path.join(dstdir, svgnow)))
+
+    if noimagetag:
+        g.unlink()
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -494,7 +601,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.action_Break.triggered.connect(self.breakContour)
         self.action_Quit.triggered.connect(self.close)
         self.action_Reload.triggered.connect(self.loadPNG)
-        self.action_Previous.triggered.connect(self.loadPrevious)
+        self.action_Previous.triggered.connect(self.loadPreviousPNG)
         self.action_Next.triggered.connect(self.loadNextPNG)
         self.action_Up.triggered.connect(self.upKernel)
         self.action_Down.triggered.connect(self.downKernel)
